@@ -27,6 +27,10 @@ directories one level below it.
 Both the target and the configuration file within it can be overridden per
 invocation; see [cli.md](cli.md).
 
+The file is normally authored by hand. It can also be produced whole from a
+command line, in which case what is written down is what was typed, in the order
+it was typed, and the file it replaces is gone — see [cli.md](cli.md).
+
 ## Format
 
 A line-oriented plain text file whose meaningful lines are an ordered list of
@@ -109,5 +113,7 @@ comparing entries across strata.
   directory happens to sit.
 - Cloning or updating source repositories.
 - Any configuration format beyond this file — no environment-variable source
-  lists, no command-line source lists that accumulate into a persistent
-  configuration.
+  lists, and no command-line source list that *accumulates* into this one. A
+  command line may replace the file's entire content, per [cli.md](cli.md),
+  which leaves this file as the single declaration of what is layered; nothing
+  merges into it, and no second place holds part of the answer.

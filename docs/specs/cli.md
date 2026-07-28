@@ -57,6 +57,33 @@ serving, since the mount lives as long as the process; `--detach` returns once
 the view is ready and reports how to stop it, which is what a service manager or
 a shell profile needs.
 
+`--source <path>`, short `-s`, declares one source and is accepted more than
+once; the order the flags are given in is the precedence order, most general
+first. Giving any of them **replaces** the configuration file with exactly that
+list before the view is served, and creates the target directory if it is not
+there yet — so that a workspace can be brought into being by one command instead
+of by a file that has to be authored first.
+
+It is a replacement, never a merge: whatever the file said, comments included,
+is gone, and nothing is kept alongside it. That is the point of it being one
+flag on one command rather than a general editing facility — someone who typed
+the list they want is stating the whole list, and a flag that quietly appended
+to what was already there would produce an order nobody wrote. The new list is
+resolved *before* the old file is replaced, though, so a mistyped path leaves
+the existing configuration standing rather than replacing it with something that
+does not resolve.
+
+A path given this way is written down as it was typed, so that `~` and `$VAR`
+survive into the file and it keeps the form its author would recognise. The one
+exception is a path still relative after expansion: on the command line it means
+"from the working directory", inside the file it would mean "from the file's
+directory", so it is made absolute before being written. Writing it verbatim
+would silently change which directory it names.
+
+The flag is on `mount` alone. `sources` and `status` report and touch nothing; a
+read-only command that rewrote the configuration as a side effect would be a
+trap.
+
 **`umount`** — release the target's mounts, including recovering a stale mountpoint
 left by a serving process that died. Reports that nothing was mounted rather than
 failing.
@@ -105,8 +132,10 @@ would make the normal case indistinguishable from a broken configuration.
 
 ## Non-goals
 
-- Editing the configuration file. It is authored by hand and reviewed in git;
-  a command that rewrote it would produce diffs nobody wrote.
+- Editing the configuration file *in place*. `mount --source` replaces it whole;
+  nothing appends a line to it, rewrites one line of it, or reorders it. A
+  command that edited it piecewise would produce diffs nobody wrote, and the
+  file is otherwise authored by hand and reviewed in git.
 - Installing mount prerequisites. `doctor` reports and explains; installing needs
   root, and a tool that asks for root to install a system package is a tool that
   should have printed the command instead.

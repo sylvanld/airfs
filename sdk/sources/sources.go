@@ -85,7 +85,7 @@ func Parse(path string) (*Config, error) {
 		if !ok {
 			continue
 		}
-		resolved, err := expand(declared, base)
+		resolved, err := Expand(declared, base)
 		if err != nil {
 			return nil, airfs.Precondition(fmt.Errorf("%s:%d: %w", path, line, err))
 		}
@@ -114,11 +114,14 @@ func meaningful(line string) (string, bool) {
 	return line, line != ""
 }
 
-// expand applies the leading `~`, then `$VAR` and `${VAR}`, then resolves a
+// Expand applies the leading `~`, then `$VAR` and `${VAR}`, then resolves a
 // still-relative path against base — the directory holding the configuration
 // file. An unset variable is an error, never an empty string: silently
 // resolving to a shorter path would layer something nobody declared.
-func expand(path, base string) (string, error) {
+//
+// It is exported so that a frontend writing a declaration into the file can ask
+// what it will mean when read back, rather than reimplementing these rules.
+func Expand(path, base string) (string, error) {
 	if path == "~" || strings.HasPrefix(path, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {

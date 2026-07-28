@@ -77,6 +77,11 @@ Flags, accepted by every command:
   --target dir   Where the view is exposed (default $HOME/.ai-resources)
   --config file  The source list to read (default <target>/sources.txt)
 
+Flags, accepted by mount only:
+  --detach       Return once the view is ready instead of blocking
+  -s, --source   Declare one source; repeat it for each, most general first.
+                 Giving any replaces the source list with exactly these.
+
 Exit codes: 0 success, 2 unsatisfied precondition, 1 anything else.
 `)
 }
@@ -133,6 +138,101 @@ func absolute(path string) (string, error) {
 		path = filepath.Join(home, strings.TrimPrefix(path, "~"))
 	}
 	return filepath.Abs(path)
+}
+
+// A sourceList collects a repeatable --source flag. The order the flags were
+// given in is kept, because that order is the precedence order.
+type sourceList []string
+
+func (l *sourceList) String() string { return strings.Join(*l, " ") }
+
+func (l *sourceList) Set(value string) error {
+	if strings.TrimSpace(value) == "" {
+		return errors.New("a source cannot be empty")
+	}
+	*l = append(*l, value)
+	return nil
+}
+
+// write replaces the configuration with the sources declared on the command
+// line, creating the directory that holds it when it is not there yet — which
+// is what lets one command bring a workspace into being.
+//
+// The list is resolved from a temporary file first and only put in place once
+// it holds. The flag destroys whatever the file said, comments included, so a
+// mistyped path has to leave the existing configuration standing rather than
+// replace it with something that does not resolve.
+func (p paths) write(declared []string) error {
+	lines := make([]string, 0, len(declared))
+	for _, d := range declared {
+		written, err := asDeclaration(d)
+		if err != nil {
+			return err
+		}
+		lines = append(lines, written)
+	}
+
+	dir := filepath.Dir(p.config)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	// The temporary file sits beside the real one so that a relative
+	// declaration resolves against the same directory either way.
+	tmp, err := os.CreateTemp(dir, sources.FileName+".*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(strings.Join(lines, "\n") + "\n"); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if _, err := sources.Load(tmp.Name()); err != nil {
+		return blameTheFlag(err, tmp.Name(), declared)
+	}
+	// CreateTemp opens at 0600; the configuration is an ordinary readable file.
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), p.config)
+}
+
+// blameTheFlag renames the file a failed resolution points at. Resolution
+// reports `<file>:<line>: …`, but this list was never in a file the reader can
+// open — the temporary one is an implementation detail and is already gone by
+// the time they read this. Each line is one flag, so each is named as one.
+func blameTheFlag(err error, tmp string, declared []string) error {
+	msg := err.Error()
+	for i, d := range declared {
+		msg = strings.ReplaceAll(msg,
+			fmt.Sprintf("%s:%d:", tmp, i+1),
+			fmt.Sprintf("--source %s:", d))
+	}
+	// Nothing above resolves, so nothing above is airfs malfunctioning.
+	return airfs.Precondition(errors.New(msg))
+}
+
+// asDeclaration is how a source typed on the command line is written down. It
+// is kept as typed, so that `~` and `$VAR` survive into the file and it keeps
+// the form its author would recognise.
+//
+// A path still relative after expansion is the exception: on the command line
+// it means "from the working directory", in the file it would mean "from the
+// file's directory", so it is made absolute first. Written verbatim it would
+// silently name a different directory.
+func asDeclaration(declared string) (string, error) {
+	// An empty base leaves a relative path relative, which is the whole question.
+	expanded, err := sources.Expand(declared, "")
+	if err != nil {
+		return "", airfs.Precondition(err)
+	}
+	if filepath.IsAbs(expanded) {
+		return declared, nil
+	}
+	return absolute(declared)
 }
 
 // load resolves the configuration, replacing the bare open error with an
@@ -238,11 +338,22 @@ func reportShadowing(cfg *sources.Config) error {
 
 func cmdMount(args []string) error {
 	var detach bool
+	var declared sourceList
 	p, err := bind("mount", args, func(fs *flag.FlagSet) {
 		fs.BoolVar(&detach, "detach", false, "return once the view is ready instead of blocking")
+		fs.Var(&declared, "source", "declare one source, most general first; repeat for each. Replaces the source list")
+		fs.Var(&declared, "s", "shorthand for -source")
 	})
 	if err != nil {
 		return err
+	}
+	// The detached child re-runs the same flags, so it rewrites the same list to
+	// the same content — idempotent, and it keeps the child reading exactly what
+	// the caller wrote rather than whatever the file happened to say.
+	if len(declared) > 0 {
+		if err := p.write(declared); err != nil {
+			return err
+		}
 	}
 	cfg, err := p.load()
 	if err != nil {

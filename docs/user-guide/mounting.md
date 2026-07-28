@@ -44,6 +44,17 @@ Serving in the background. Stop it with: airfs umount --target /home/you/.ai-res
 Mounting is all-or-nothing: if any kind cannot be mounted, the ones already
 established are released, and you are left with the state you started in.
 
+```bash
+airfs mount --target ~/scratch-ws -s ~/ai/personal -s ~/ai/project
+```
+
+`-s` declares the layers inline, creating the target and **replacing** its
+`sources.txt` with exactly that list before serving. It is how a throwaway
+workspace becomes one command instead of a file to author first — and it is
+destructive to the file it replaces, so read
+[declaring-layers.md](declaring-layers.md#writing-it-from-the-command-line)
+before pointing it at a workspace you care about.
+
 ### What gets refused, and why 🚧
 
 | Refusal | Why |

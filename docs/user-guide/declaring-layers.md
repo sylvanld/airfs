@@ -83,8 +83,40 @@ never have to `mkdir` before adding a resource of a new kind.
 - **Per-kind configuration.** The kinds are fixed and built in, which is what
   keeps unrelated top-level directories from leaking into a workspace.
 
-`airfs` never rewrites this file either. It is authored by hand and reviewed in
-git; a command that edited it would produce diffs nobody wrote.
+## Writing it from the command line ✍️
+
+The file is normally authored by hand. `airfs mount -s` writes one for you
+instead, which is how a workspace goes from nothing to served in a single
+command:
+
+```bash
+airfs mount --target ~/scratch-ws -s ~/ai/personal -s $WORK/ai-platform
+```
+
+`-s` (long form `--source`) is given once per layer, most general first — the
+order of the flags **is** the precedence order. The target directory is created
+if it is not there yet.
+
+!!! danger "It replaces the file, it does not add to it"
+
+    Every layer you want must be on the command line. Whatever `sources.txt`
+    said before — layers, comments, ordering — is gone, and no backup is kept.
+    A flag that appended to what was already there would build an order nobody
+    wrote.
+
+    The one protection is that the new list is resolved *before* the old file is
+    given up: a typo'd path fails with exit `2` and leaves your existing
+    configuration exactly as it was.
+
+Paths are written down as you typed them, so `~/ai/personal` stays
+`~/ai/personal` in the file rather than being frozen into `/home/you/...`. The
+exception is a path that is still relative after expansion: on the command line
+it means "from where I am standing", in the file it would mean "from the file's
+directory", so it is made absolute before being written.
+
+Nothing else rewrites this file. `-s` is on `mount` alone — `airfs sources` and
+`airfs status` report and touch nothing, and a read-only command that edited
+your configuration as a side effect would be a trap.
 
 ## Checking what it means 🔍
 
