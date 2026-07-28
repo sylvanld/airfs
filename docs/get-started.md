@@ -3,13 +3,43 @@
 Install `airfs`, declare two layers, and read them as one directory. About five
 minutes, ending with a working workspace you can keep.
 
-## 1. Check the host 🩺
+## 1. Install 📦
+
+`airfs` links no C library, so installing is one command and needs no toolchain
+beyond Go:
+
+```bash
+go install github.com/sylvanld/airfs/cmd/airfs@latest
+```
+
+Make sure `$(go env GOPATH)/bin` is on your `PATH`, then check it runs:
+
+```bash
+airfs help
+```
+
+!!! tip "No Go on this machine?"
+
+    Every release ships a prebuilt binary for Linux and macOS on `amd64` and
+    `arm64` — no Go toolchain needed. Download the archive for your platform from
+    the [releases page](https://github.com/sylvanld/airfs/releases), unpack it,
+    and put `airfs` somewhere on your `PATH`:
+
+    ```bash
+    tar -xzf airfs_<version>_linux_amd64.tar.gz
+    install -m 755 airfs ~/.local/bin/airfs
+    ```
+
+    Each release also publishes `checksums.txt`, so you can verify the download
+    with `sha256sum -c` before installing it.
+
+## 2. Check the host 🩺
 
 Mounting needs two things an unprivileged process cannot provide for itself:
 `/dev/fuse`, and a **setuid** `fusermount3`. Both ship with your distribution's
 FUSE package and are already present on a normal desktop Linux.
 
-Ask before installing anything:
+Now that `airfs` is installed, ask it — before installing anything else:
 
 ```bash
 airfs doctor
@@ -30,21 +60,6 @@ and Arch — then run `airfs doctor` again.
 
     Installing a system package needs root, and a tool that asks you for root to
     run a package manager is a tool that should have printed the command instead.
-
-## 2. Install 📦
-
-`airfs` links no C library, so installing is one command and needs no toolchain
-beyond Go:
-
-```bash
-go install github.com/sylvanld/airfs/cmd/airfs@latest
-```
-
-Make sure `$(go env GOPATH)/bin` is on your `PATH`, then check it runs:
-
-```bash
-airfs help
-```
 
 ## 3. Create a workspace 🗂️
 

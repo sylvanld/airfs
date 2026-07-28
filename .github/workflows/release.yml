@@ -1,0 +1,43 @@
+name: Release
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      # A published release is immutable once the assets are attached, so the
+      # quality gates run before anything is built rather than in parallel.
+      - run: make check
+      - name: Build the release archives
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${target%/*}
+            arch=${target#*/}
+            GOOS=$os GOARCH=$arch CGO_ENABLED=0 \
+              go build -trimpath -ldflags '-s -w' -o "dist/airfs" ./cmd/airfs
+            tar -czf "dist/airfs_${VERSION}_${os}_${arch}.tar.gz" -C dist airfs
+            rm dist/airfs
+          done
+          cd dist && sha256sum *.tar.gz > checksums.txt
+      - name: Attach the archives to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber
+      # Publishing a Go module is just the tag existing; asking the proxy for it
+      # is what makes `go install ...@<tag>` work without a first-user delay.
+      - name: Publish the module to the Go proxy
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          GOPROXY=proxy.golang.org go list -m "github.com/sylvanld/airfs@${VERSION}"
