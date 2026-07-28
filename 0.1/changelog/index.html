@@ -1290,50 +1290,24 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<p>All notable changes to <code>airfs</code> are documented here. Versions follow
-<a href="https://semver.org/">semantic versioning</a>.</p>
+<p>All notable changes to <code>airfs</code> are documented here. Versions follow <a href="https://semver.org/">semantic versioning</a>.</p>
 <h2 id="v010-hello-world">v0.1.0 — hello, world 🪄<a class="headerlink" href="#v010-hello-world" title="Permanent link">&para;</a></h2>
-<div class="admonition tip">
-<p class="admonition-title">Many sources, one read-only view, no copies.</p>
-<p>Your AI capabilities are scattered across repositories — personal, work, one
-per project — and every tool wants a single folder. Copy them together and
-each copy starts drifting from the day you made it. <code>airfs</code> gives you the
-folder without the copies.</p>
-</div>
-<p>You write down which repositories a workspace is made of, in order. <code>airfs</code>
-shows them to you as one directory 📂. Nothing moves, nothing is duplicated, and
-editing a skill in the repository that owns it changes what every workspace
-layering it sees — right away, with no sync step to remember. 🔄</p>
+<blockquote>
+<p><strong>Many sources, one read-only view, no copies.</strong> Your AI capabilities are scattered across repositories — personal, work, one per project — and every tool wants a single folder. Copy them together and each copy starts drifting from the day you made it. <code>airfs</code> gives you the folder without the copies.</p>
+</blockquote>
+<p>You write down which repositories a workspace is made of, in order. <code>airfs</code> shows them to you as one directory 📂. Nothing moves, nothing is duplicated, and editing a skill in the repository that owns it changes what every workspace layering it sees — right away, with no sync step to remember. 🔄</p>
 <ul>
-<li>🥇 <strong>Order decides.</strong> <code>sources.txt</code> is one path per line, most general first.
-  Two layers both shipping a <code>commit</code> skill? The one declared last wins — and it
-  wins <em>whole</em>, never half of yours stitched onto half of theirs.</li>
-<li>🕵️ <strong>Nothing gets shadowed behind your back.</strong> <code>airfs sources</code> prints the
-  resolved list and names every entry that lost, right next to the one that beat
-  it. A workspace you cannot explain is a workspace you cannot trust.</li>
-<li>🚪 <strong>One mount per kind.</strong> <code>airfs mount</code> serves <code>agents/</code>, <code>skills/</code>,
-  <code>commands/</code>, and <code>scripts/</code> together — in the foreground, or with <code>--detach</code>
-  when you want your terminal back. <code>airfs status</code> says what is being served,
-  and <code>airfs umount</code> takes it down, stale leftovers included.</li>
-<li>🛡️ <strong>Read-only, with the kernel enforcing it.</strong> No tool, no agent, and no
-  stray <code>mv</code> can write back into one of your source repositories through the
-  view.</li>
-<li>🐹 <strong>Pure Go, so installing is one command.</strong> It speaks FUSE over <code>/dev/fuse</code>
-  by itself: no C library, no <code>mergerfs</code> to hunt down, nothing to unpack by
-  hand.</li>
-<li>🩺 <strong><code>airfs doctor</code> before you file a bug.</strong> Mounting needs <code>/dev/fuse</code> and a
-  setuid <code>fusermount3</code>, which no unprivileged process can conjure up. <code>doctor</code>
-  checks both and names the package that provides the missing one.</li>
-<li>📦 <strong>A Go library first, a CLI second.</strong> <code>sdk/layerfs</code> is an <code>fs.FS</code>, so your
-  own program can read the merged view in process — no mount, no subprocess,
-  nothing to parse — and <code>fs.WalkDir</code> and friends just work on it.</li>
+<li>🥇 <strong>Order decides.</strong> <code>sources.txt</code> is one path per line, most general first. Two layers both shipping a <code>commit</code> skill? The one declared last wins — and it wins <em>whole</em>, never half of yours stitched onto half of theirs.</li>
+<li>🕵️ <strong>Nothing gets shadowed behind your back.</strong> <code>airfs sources</code> prints the resolved list and names every entry that lost, right next to the one that beat it. A workspace you cannot explain is a workspace you cannot trust.</li>
+<li>🚪 <strong>One mount per kind.</strong> <code>airfs mount</code> serves <code>agents/</code>, <code>skills/</code>, <code>commands/</code>, and <code>scripts/</code> together — in the foreground, or with <code>--detach</code> when you want your terminal back. <code>airfs status</code> says what is being served, and <code>airfs umount</code> takes it down, stale leftovers included.</li>
+<li>🛡️ <strong>Read-only, with the kernel enforcing it.</strong> No tool, no agent, and no stray <code>mv</code> can write back into one of your source repositories through the view.</li>
+<li>🐹 <strong>Pure Go, so installing is one command.</strong> It speaks FUSE over <code>/dev/fuse</code> by itself: no C library, no <code>mergerfs</code> to hunt down, nothing to unpack by hand.</li>
+<li>🩺 <strong><code>airfs doctor</code> before you file a bug.</strong> Mounting needs <code>/dev/fuse</code> and a setuid <code>fusermount3</code>, which no unprivileged process can conjure up. <code>doctor</code> checks both and names the package that provides the missing one.</li>
+<li>📦 <strong>A Go library first, a CLI second.</strong> <code>sdk/layerfs</code> is an <code>fs.FS</code>, so your own program can read the merged view in process — no mount, no subprocess, nothing to parse — and <code>fs.WalkDir</code> and friends just work on it.</li>
 </ul>
-<div class="admonition note">
-<p class="admonition-title">It is a first release, so: Linux for the mount 🐧</p>
-<p>Mounting is Linux-only for now; the Go SDK is plain <code>fs.FS</code> and runs
-anywhere. Best next step is <a href="../get-started/">Get started</a> — about five
-minutes, ending with a workspace you can keep. 🚀</p>
-</div>
+<blockquote>
+<p><strong>It is a first release, so: Linux for the mount 🐧</strong> — mounting is Linux-only for now; the Go SDK is plain <code>fs.FS</code> and runs anywhere. Best next step is <a href="https://sylvanld.github.io/airfs/get-started/">Get started</a> — about five minutes, ending with a workspace you can keep. 🚀</p>
+</blockquote>
 
 
 
