@@ -12,7 +12,10 @@ is never mistaken for a clean run.
 
 | Target | Verifies | Why it exists |
 | --- | --- | --- |
-| `lint` | Every document in `docs/specs/` and `docs/contribute/` is listed in that directory's `index.md`, and every document an index links to exists | The indexes are how anyone finds a spec. An unlisted spec is invisible, so the next contributor writes a second spec for the same topic; a link to a deleted document sends them looking for something that is gone. |
+| `lint` | Every document in `docs/specs/`, `docs/user-guide/`, and `docs/contribute/` is listed in that directory's `index.md`, and every document an index links to exists | The indexes are how anyone finds a spec. An unlisted spec is invisible, so the next contributor writes a second spec for the same topic; a link to a deleted document sends them looking for something that is gone. |
+| `lint` | Every Go file is in `gofmt`'s canonical formatting | Formatting that is not canonical turns into diff noise that hides the change a reviewer is looking for. It verifies rather than rewrites, so `check` never modifies the working tree; `make format` fixes what it reports. |
+| `lint` | `go vet` finds nothing | It catches the mistakes the compiler accepts — a `Printf` whose arguments do not match, a lock copied by value — which are exactly the ones that survive to runtime. |
+| `test` | The Go test suite passes | The merge semantics are the product, and they are tested against in-memory trees so that every edge case runs without a mount. The mount's own tests establish real FUSE mounts and skip on a host that cannot. |
 
 Each gate stays separately invocable, so `make lint` runs just that one.
 
@@ -25,6 +28,19 @@ Each gate stays separately invocable, so `make lint` runs just that one.
   updating the index. Fix the row, or remove it and record the replacement if the
   spec was superseded.
 - **`docs/specs/index.md: missing`** — the index was deleted. It is not optional.
+
+## When `lint` fails on Go
+
+- **`not gofmt-formatted`** — run `make format`, which rewrites exactly the files
+  it named.
+- **a `go vet` diagnostic** — fix the code. Vet reports no false positives worth
+  silencing here; a suppression would need to explain itself in the spec first.
+
+## When `test` fails
+
+- **a mount test that skipped** — the host lacks `/dev/fuse` or a setuid
+  `fusermount3`. Run `bin/airfs doctor` (after `make build`) for which one and
+  what provides it. The suite passes, but it has not exercised the mount.
 
 ## Adding a gate
 

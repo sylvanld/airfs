@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Enforce the indexing rule from AGENTS.md: every document in docs/specs/ and
-# docs/contribute/ is listed in that directory's index.md, and every document an
-# index lists exists.
+# Enforce the indexing rule from AGENTS.md: every document in docs/specs/,
+# docs/user-guide/, and docs/contribute/ is listed in that directory's index.md,
+# and every document an index lists exists.
 set -uo pipefail
 
 status=0
 
-for dir in docs/specs docs/contribute; do
+for dir in docs/specs docs/user-guide docs/contribute; do
 	index="$dir/index.md"
 
 	if [ ! -f "$index" ]; then

@@ -26,6 +26,18 @@ Exempt: typos, formatting, dependency bumps.
 - Read the index first, to see whether a spec already covers what you are about
   to touch.
 
+## User documentation lives in `docs/user-guide/`
+
+How to *use* what is built: the commands, the configuration file, the Go API,
+and what to do when something does not work. One document per question, listed
+in [`docs/user-guide/index.md`](docs/user-guide/index.md).
+
+It describes behaviour that exists, so it is written or updated in the same
+change that implements the behaviour - a spec says what should be true, this
+says how to rely on it. `docs/get-started.md` is the one path through it that
+must stay working end to end; verify its commands against a real run rather than
+from memory.
+
 ## How-to lives in `docs/contribute/`
 
 Commands, tooling, setup, pre-push checks - one document per question, listed in

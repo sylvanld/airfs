@@ -3,8 +3,8 @@
 **One directory. Many repositories. No copies.** 🪄
 
 `airfs` is a Go SDK — and a small CLI — that layers AI resource directories
-(skills, agents, commands) from several repositories into a single **read-only
-merged view**, served as a FUSE mount written in pure Go.
+(agents, skills, commands, scripts) from several repositories into a single
+**read-only merged view**, served as a FUSE mount written in pure Go.
 
 ---
 
@@ -57,7 +57,7 @@ immediately. No sync step, no copy to refresh. 🔄
 
 ## 🗂️ The vocabulary
 
-Four words carry the whole model.
+Five words carry the whole model.
 
 <div class="grid cards" markdown>
 
@@ -68,36 +68,44 @@ Four words carry the whole model.
 
 -   **🏷️ Kind**
 
-    A category of resource = one subdirectory name: `skills`, `agents`,
-    `commands`. Declared explicitly, so unrelated top-level directories can never
-    leak into the view.
+    A category of resource = one subdirectory name: `agents`, `skills`,
+    `commands`, `scripts`. The set is fixed and built in, so unrelated top-level
+    directories can never leak into the view.
 
 -   **📄 Entry**
 
-    One resource inside a kind. A skill is a *directory*; an agent is a *file*.
-    That granularity decides what collides and what gets shadowed.
+    One resource inside a kind, named directly under it — a directory like a
+    skill, or a single file like a command. The entry is what collides and what
+    gets shadowed, and it is shadowed *whole*.
 
 -   **🥞 Stratum**
 
     One source's contribution to one kind — `<source>/<kind>/`. A kind's view is
     the ordered stack of its strata.
 
+-   **🎯 Target**
+
+    The resource folder the view lives under — `~/.ai-resources` by default. It
+    holds the configuration file and one mounted subdirectory per kind.
+
 </div>
 
 ---
 
-## 🥇 Precedence: earliest source wins
+## 🥇 Precedence: latest source wins
 
-When two repositories both ship a skill named `commit`, the one declared **first**
-wins, and it wins *whole* — no half-merged resource assembled from two places.
+Sources are declared from the most **general** to the most **specific** — global,
+then organisation, then project. When two repositories both ship a skill named
+`commit`, the one declared **last** wins, and it wins *whole* — no half-merged
+resource assembled from two places.
 
 ```mermaid
 flowchart TB
-    subgraph S["Declared order (first wins)"]
+    subgraph S["Declared order (last wins)"]
         direction LR
-        S1["1️⃣ ai-resources<br/>commit ✅<br/>review ✅"]:::win
-        S2["2️⃣ ai-tools<br/>commit ❌ shadowed<br/>deploy ✅"]:::mix
-        S3["3️⃣ ai-maintainer<br/>audit ✅"]:::win
+        S1["1️⃣ global<br/>commit ❌ shadowed<br/>review ✅"]:::mix
+        S2["2️⃣ organization<br/>deploy ✅"]:::win
+        S3["3️⃣ project<br/>commit ✅<br/>audit ✅"]:::win
     end
 
     S --> R["👀 Merged view<br/>commit · review · deploy · audit"]:::out
@@ -118,43 +126,47 @@ while losing `commit` under `commands`.
 
 !!! warning "The view is read-only"
 
-    Writes are rejected, not routed to a source. A new file in the merged view
-    belongs to *some* repository and the view has no basis to pick one — and a
-    write that succeeded would bypass that repository's git history, review, and
-    tests. **Edit in the source repo.** ✍️
+    Writes are rejected, not routed to a source — and the kernel enforces it, so
+    no process can write through the mount even by mistake. A new file in the
+    merged view belongs to *some* repository and the view has no basis to pick
+    one; a write that succeeded would bypass that repository's git history,
+    review, and tests. **Edit in the source repo.** ✍️
 
 ---
 
-## 🚪 Two ways to expose the view
+## 🚪 How the view is exposed
 
-Both frontends read through the *same* merge, so the merge semantics are defined
-and tested once.
+One FUSE mount **per kind**, all served by one process:
 
-| | 🧵 FUSE mount | 🔗 Symlink farm |
-| --- | --- | --- |
-| **Command** | `airfs mount` | `airfs sync` |
-| **Read-only** | Enforced by the kernel 🛡️ | By convention only |
-| **Needs** | `/dev/fuse` + setuid `fusermount3` | Nothing 🎒 |
-| **Lives as long as** | The serving process | Until the sources change |
-| **Use when** | You're on a normal Linux desktop | Prerequisites are unavailable |
+```
+~/.ai-resources/
+  sources.txt     # the ordered layers — never masked by a mount
+  agents/         # mountpoint
+  skills/         # mountpoint
+  commands/       # mountpoint
+  scripts/        # mountpoint
+```
 
-Not sure which you can use? Run **`airfs doctor`** — it checks the host and names
-the package to install. 🩺
+`airfs mount` establishes them together and blocks while serving; `--detach` runs
+it as a daemon instead. `airfs umount` releases them — including a stale
+mountpoint left behind by a serving process that died.
+
+Mounting needs `/dev/fuse` and a setuid `fusermount3`, both of which ship with
+your distribution's FUSE package. Not sure you have them? Run **`airfs doctor`** —
+it checks the host and names the package to install. 🩺
 
 ---
 
 ## ⚙️ Configuring it
 
-One plain-text file, one path per line. The most common diff is a single added
-line.
+One plain-text file at the root of the target, one path per line. The most common
+diff is a single added line.
 
 ```bash
-# sources.txt — order is precedence
-kinds: skills=dir, agents=file, commands=file
-
-~/sylvan/ai-resources      # 1st — wins every collision
+# ~/.ai-resources/sources.txt — order is precedence, last wins
+~/sylvan/ai-resources      # 1st — global
 ~/sylvan/ai-tools          # 2nd
-$WORK/ai-maintainer        # 3rd
+$WORK/ai-maintainer        # 3rd — wins every collision
 ```
 
 Comments, `~`, and `$VAR` are expanded; relative paths resolve against the
@@ -168,27 +180,28 @@ repository is the harder failure to diagnose. 🚧
 
 | Command | Does |
 | --- | --- |
-| `sources` 🔍 | Resolve the config and report it: order, kinds, counts, shadowing. Touches nothing. |
-| `mount` 🧵 | Serve the merged view at the target path. |
-| `umount` 🧹 | Release the mount, including a stale one. |
-| `status` 📊 | Live mount, symlink farm, or neither — and what's visible through it. |
-| `sync` 🔗 | Reconcile the symlink farm. A verify mode makes no writes and fails on drift. |
+| `sources` 🔍 | Resolve the config and report it: order, counts per kind, shadowing. Touches nothing. |
+| `mount` 🧵 | Serve the merged view under the target, one mount per kind. `--detach` to daemonise. |
+| `umount` 🧹 | Release the mounts, including stale ones. |
+| `status` 📊 | Whether the target is served, live or stale — and what's visible through it. |
 | `doctor` 🩺 | Check `/dev/fuse` and `fusermount3`, and say what to install. |
 
 ---
 
 ## 🚧 Status
 
-!!! info "Specification stage"
+!!! success "Implemented"
 
-    The specs in [`docs/specs/`](specs/index.md) are `draft`. **No implementation
-    exists yet.** `airfs` replaces a `mergerfs`-based `Makefile` setup in
+    Every spec in [`docs/specs/`](specs/index.md) is `implemented`: the library
+    and the `airfs` command exist, and the merge, the mount, and the CLI are
+    covered by tests. `airfs` replaces a `mergerfs`-based `Makefile` setup in
     [ai-resources](https://github.com/hoshiyosan/ai-resources).
 
     No implementation change lands without an agreed spec.
 
 ## 👉 Where next
 
-- 🚀 [Get started](get-started.md) — install and first mount
-- 📐 [Specs](specs/index.md) — the model, the merge, the frontends, the CLI
+- 🚀 [Get started](get-started.md) — install and first mount, in five minutes
+- 📚 [User guide](user-guide/index.md) — layers, precedence, mounting, the Go API
+- 📐 [Specs](specs/index.md) — the model, the merge, the mount, the CLI
 - 🤝 [Contribute](contribute/index.md) — setup, targets, and quality gates

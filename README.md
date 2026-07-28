@@ -11,7 +11,8 @@ reuse the same underlying capabilities while exposing only what is relevant to
 its context.
 
 📖 **[Documentation](https://sylvanld.github.io/airfs/)** ·
-🚀 **[Get started](https://sylvanld.github.io/airfs/get-started/)**
+🚀 **[Get started](https://sylvanld.github.io/airfs/get-started/)** ·
+📚 **[User guide](https://sylvanld.github.io/airfs/user-guide/)**
 
 ## The problem 🧩
 
@@ -55,17 +56,19 @@ workspaces without any of them seeing the others' layers.
 
 ## How workspaces are composed 🥇
 
-Layers are an **ordered** list, and that order *is* the precedence order. When
-two layers both ship a skill named `commit`, the one declared **first** wins -
-and it wins *whole*, never half-assembled from two places.
+Layers are an **ordered** list, and that order *is* the precedence order. They
+are declared from the most general to the most specific, so when two layers both
+ship a skill named `commit`, the one declared **last** wins - the local
+definition beats the global one, and it wins *whole*, never half-assembled from
+two places.
 
 ```mermaid
 flowchart TB
-    subgraph S["Declared order - first wins"]
+    subgraph S["Declared order - last wins"]
         direction LR
-        S1["1️⃣ ai-resources<br/>commit ✅<br/>review ✅"]
-        S2["2️⃣ ai-tools<br/>commit ❌ shadowed<br/>deploy ✅"]
-        S3["3️⃣ ai-maintainer<br/>audit ✅"]
+        S1["1️⃣ personal<br/>commit ❌ shadowed<br/>review ✅"]
+        S2["2️⃣ organization<br/>deploy ✅"]
+        S3["3️⃣ project<br/>commit ✅<br/>audit ✅"]
     end
 
     S --> R["👀 Workspace view<br/>commit · review · deploy · audit"]
@@ -83,20 +86,27 @@ flowchart TB
 > new file in the view would belong to *some* repository, and the view has no
 > basis to pick one. ✍️
 
-## Two ways to expose a workspace 🚪
+## How a workspace is exposed 🚪
 
-Both frontends read through the *same* composition, so the layering semantics are
-defined and tested once.
+A workspace is a folder holding its own declaration and one FUSE mount per kind
+of capability:
 
-| | 🧵 FUSE mount | 🔗 Symlink farm |
-| --- | --- | --- |
-| **Command** | `airfs mount` | `airfs sync` |
-| **Read-only** | Enforced by the kernel 🛡️ | By convention only |
-| **Needs** | `/dev/fuse` + setuid `fusermount3` | Nothing 🎒 |
-| **Use when** | You're on a normal Linux desktop | Prerequisites are unavailable |
+```
+~/.ai-resources/
+  sources.txt     # the ordered layers - never masked by a mount
+  agents/         # mountpoint
+  skills/         # mountpoint
+  commands/       # mountpoint
+  scripts/        # mountpoint
+```
 
-Not sure which you can use? Run **`airfs doctor`** - it checks the host and names
-the package to install. 🩺
+`airfs mount` establishes them together and blocks while serving, or runs as a
+daemon with `--detach`; `airfs umount` releases them, stale mountpoints included.
+Read-only is enforced by the kernel 🛡️, so nothing can write into a source
+repository through the view even by mistake.
+
+Mounting needs `/dev/fuse` and a setuid `fusermount3`. Not sure you have them?
+Run **`airfs doctor`** - it checks the host and names the package to install. 🩺
 
 ## Why pure Go 🐹
 
@@ -106,11 +116,11 @@ the FUSE protocol over `/dev/fuse` from Go, linking no C library and requiring n
 filesystem binary.
 
 > [!NOTE]
-> Two host requirements remain, because an unprivileged process cannot mount
-> without them: `/dev/fuse`, and a **setuid** `fusermount3` - which ships with the
-> system FUSE package and is already there on a normal desktop Linux. Where
-> neither is available, the symlink farm materialises the same view, trading the
-> kernel-enforced read-only guarantee for portability.
+> Go dependencies are fine as long as they are cgo-free, so `go install` stays the
+> whole installation. Two host requirements remain, because an unprivileged
+> process cannot mount without them: `/dev/fuse`, and a **setuid** `fusermount3` -
+> which ships with the system FUSE package and is already there on a normal
+> desktop Linux.
 
 ## Contributing 🤝
 
