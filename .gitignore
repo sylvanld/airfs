@@ -2,8 +2,8 @@
 *.test
 
 # Documentation site build output and caches (make docs-clean)
-/docs/build/
-/docs/.cache/
+/site/
+/.cache/
 /.venv-docs/
 
 # Built command (make build)

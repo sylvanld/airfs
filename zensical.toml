@@ -12,8 +12,13 @@
 #
 # Read more: https://zensical.org/docs/setup/basics/#site_name
 site_name = "Documentation"
-docs_dir = "."
-site_dir = "build/"
+
+# This configuration sits at the repository root rather than next to the
+# Markdown, so that the generator's build cache and the built site are written
+# here, outside "docs_dir". Everything inside "docs_dir" is published verbatim,
+# and neither of those belongs in a published site.
+docs_dir = "docs"
+site_dir = "site/"
 
 # The site_description is included in the HTML head and should contain a
 # meaningful description of the site content for use by search engines.
@@ -29,7 +34,10 @@ site_author = "Sylvan Le Deunff"
 # The site_url is the canonical URL for your site. When building online
 # documentation you should set this.
 # Read more: https://zensical.org/docs/setup/basics/#site_url
-#site_url = "https://www.example.com/"
+#
+# Versioned builds are published under this URL as subdirectories, e.g.
+# .../airfs/0.1/ and .../airfs/latest/, so the trailing slash matters.
+site_url = "https://sylvanld.github.io/airfs/"
 
 # The copyright notice appears in the page footer and can contain an HTML
 # fragment.
@@ -38,6 +46,16 @@ site_author = "Sylvan Le Deunff"
 copyright = """
 Copyright &copy; 2026 The authors
 """
+
+# The repository link in the header, plus the source of the "Edit this page"
+# and "View source" actions below.
+#
+# Read more: https://zensical.org/docs/setup/repository/
+repo_url = "https://github.com/sylvanld/airfs"
+repo_name = "sylvanld/airfs"
+
+# The default edit_uri assumes a "master" branch; this project uses "main".
+edit_uri = "edit/main/docs"
 
 # Zensical supports both implicit navigation and explicitly defined navigation.
 # If you decide not to define a navigation here then Zensical will simply
@@ -124,13 +142,13 @@ features = [
     # will generate an edit button for the page. This works for common
     # repository hosting services.
     # https://zensical.org/docs/setup/repository/#content-actions
-    #"content.action.edit",
+    "content.action.edit",
 
     # If you have a repository configured and turn on this feature, Zensical
     # will generate a button that allows the user to view the Markdown
     # code for the current page.
     # https://zensical.org/docs/setup/repository/#content-actions
-    #"content.action.view",
+    "content.action.view",
 
     # Code annotations allow you to add an icon with a tooltip to your
     # code blocks to provide explanations at crucial points.
@@ -305,6 +323,25 @@ toggle.name = "Switch to light mode"
 #[[project.extra.social]]
 #icon = "fontawesome/brands/github"
 #link = "https://github.com/user/repo"
+
+# ----------------------------------------------------------------------------
+# The version selector in the header is fed by the versions.json that mike
+# writes at the root of the gh-pages branch. It only appears on a site served
+# from such a deployment, so a local `zensical serve` shows no selector.
+#
+# Read more:
+# - https://zensical.org/docs/setup/versioning/
+# ----------------------------------------------------------------------------
+[project.extra.version]
+provider = "mike"
+
+# Visitors landing on the bare site URL are redirected to this alias, and any
+# other version is what the "latest" link in the outdated notice points at.
+default = "latest"
+
+# Show the alias ("latest") next to the version number in the selector, so a
+# reader can tell which of the entries is the one they are being served.
+alias = true
 
 # ----------------------------------------------------------------------------
 # In this section you can configure the Markdown extensions that are used when

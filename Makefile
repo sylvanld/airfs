@@ -1,14 +1,18 @@
 SHELL := bash
 
 .DEFAULT_GOAL := help
-.PHONY: help check lint format test build docs-serve docs-build docs-clean
+.PHONY: help check lint format test build docs-serve docs-build docs-deploy docs-clean
 
 DOCS := docs
 DOCS_PORT := 10000
 
-# The site generator treats all of $(DOCS) as content, so the Python
-# environment must live outside it or it ends up in the published site.
+# Everything in $(DOCS) is published, so the Python environment uv would
+# otherwise create in $(DOCS)/.venv is kept out of it.
 export UV_PROJECT_ENVIRONMENT := $(CURDIR)/.venv-docs
+
+# The generator runs from the root, where zensical.toml is, so that the site
+# and the build cache are written outside $(DOCS).
+ZENSICAL := uv run --project $(DOCS)
 
 help: ## List available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -34,10 +38,17 @@ build: ## Build the airfs command into bin/
 	@go build -o bin/airfs ./cmd/airfs
 
 docs-serve: ## Open the documentation with live reload (port: DOCS_PORT, default 10000)
-	cd $(DOCS) && uv run zensical serve --open -a 127.0.0.1:$(DOCS_PORT)
+	$(ZENSICAL) zensical serve --open -a 127.0.0.1:$(DOCS_PORT)
 
-docs-build: ## Build the documentation site into docs/build
-	cd $(DOCS) && uv run zensical build --clean --strict
+docs-build: ## Build the documentation site into site/
+	$(ZENSICAL) zensical build --clean --strict
+
+docs-deploy: ## Publish VERSION of the docs to gh-pages as the new "latest" (CI does this on release)
+	@test -n "$(VERSION)" || { echo "docs-deploy needs VERSION, e.g. make docs-deploy VERSION=0.1"; exit 2; }
+	$(ZENSICAL) mike deploy --push --update-aliases "$(VERSION)" latest
+	# Point the bare site URL at the alias, so it keeps working when "latest"
+	# moves on to the next release.
+	$(ZENSICAL) mike set-default --push latest
 
 docs-clean: ## Remove the built documentation site and its build cache
-	rm -rf $(DOCS)/build $(DOCS)/.cache
+	rm -rf site .cache

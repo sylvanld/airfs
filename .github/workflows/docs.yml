@@ -1,26 +1,99 @@
 name: Documentation
+
+# The published site is versioned, so it only changes when a version exists:
+# a release adds (or refreshes) one entry in the version selector. The manual
+# trigger re-publishes whatever the gh-pages branch already holds, which is
+# how to repair the site without cutting a release.
 on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  # Not to publish anything, but so that a build the strict mode rejects is
+  # caught here rather than while a release is being published.
   push:
-    branches:
-      - master
-      - main
+    branches: [main]
+  pull_request:
+
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
+
+# Two releases published back to back would otherwise race for the gh-pages
+# branch and for the Pages deployment.
+concurrency:
+  group: docs
+  cancel-in-progress: false
+
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # A build whose output is thrown away: it only has to fail.
+  verify:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/configure-pages@v6
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: make docs-build
+
+  # mike keeps every version as a directory on the gh-pages branch, next to the
+  # versions.json that feeds the selector. It builds the site itself, so this
+  # job is the only place the documentation is built.
+  version:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # mike commits onto gh-pages, so it needs a real repository rather
+          # than the single-commit checkout the default gives.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+      - name: Derive the documentation version from the tag
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # A patch release documents the same feature set as the minor it
+          # fixes, so v0.2.3 refreshes the "0.2" entry rather than adding a
+          # third one nobody would know how to choose between.
+          version=${TAG#v}
+          echo "version=${version%.*}" >> "$GITHUB_OUTPUT"
+      - name: Publish the version to the gh-pages branch
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          make docs-deploy VERSION="$VERSION"
+
+  # Pages is fed from an artifact rather than from the branch directly, so the
+  # repository keeps its "GitHub Actions" Pages source and the deployment still
+  # shows up under the github-pages environment.
+  publish:
+    needs: [version]
+    # `needs` alone would skip this job on workflow_dispatch, where the version
+    # job does not run at all — and would let a push, which publishes nothing,
+    # reach the deployment.
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.version.result == 'success')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v6
+      - uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          path: site
+      # The artifact is the directory as it stands, .git included, so the
+      # branch history would otherwise be uploaded as part of the site.
+      - run: rm -rf site/.git
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: docs/build
+          # The upload dereferences symlinks, which is what turns mike's
+          # "latest" symlink into a real copy of the version it points at.
+          path: site
       - uses: actions/deploy-pages@v5
         id: deployment
