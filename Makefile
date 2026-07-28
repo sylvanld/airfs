@@ -17,6 +17,10 @@ help: ## List available targets
 	@echo
 	@echo "Setup and prerequisites: docs/contribute/index.md"
 
+check: lint ## Run every quality gate (what CI runs, and what to run before pushing)
+
+lint: ## Verify the docs indexes list every spec and how-to document
+	@scripts/check-docs-index.sh
 
 docs-serve: ## Open the documentation with live reload (port: DOCS_PORT, default 10000)
 	cd $(DOCS) && uv run zensical serve --open -a 127.0.0.1:$(DOCS_PORT)
