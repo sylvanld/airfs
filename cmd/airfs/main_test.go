@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sylvanld/airfs"
-	"github.com/sylvanld/airfs/sources"
+	"github.com/sylvanld/airfs/sdk"
+	"github.com/sylvanld/airfs/sdk/sources"
 )
 
 // An absent configuration is the first thing a new user hits, so it is answered

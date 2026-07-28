@@ -17,8 +17,8 @@ import (
 
 	gofs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
-	"github.com/sylvanld/airfs"
-	"github.com/sylvanld/airfs/sources"
+	"github.com/sylvanld/airfs/sdk"
+	"github.com/sylvanld/airfs/sdk/sources"
 )
 
 // FSName is the filesystem name set at mount time. Finding a mount means

@@ -5,7 +5,7 @@ that needs the merged view consumes it **in process**, with no mount, no
 subprocess, and nothing to parse.
 
 ```bash
-go get github.com/sylvanld/airfs
+go get github.com/sylvanld/airfs/sdk/...
 ```
 
 There is deliberately no machine-readable output mode on the CLI. A second,
@@ -121,12 +121,16 @@ same distinction the CLI turns into exit code `2`.
 
 ## Package map 🗺️
 
+Everything importable lives under `sdk/`; `cmd/airfs` is the frontend and is not
+part of the API. The `sdk` directory holds package `airfs`, so an import of
+`.../airfs/sdk` is used as `airfs.Kind`, `airfs.IsPrecondition`, and so on.
+
 | Package | Holds |
 | --- | --- |
-| `github.com/sylvanld/airfs` | The model: `Kind`, `Kinds`, the precondition contract, exit codes. |
-| `.../airfs/layerfs` | The ordered read-only union, as a standard `fs.FS`. |
-| `.../airfs/sources` | Reading and resolving `sources.txt` into layers. |
-| `.../airfs/mount` | Exposing a view at a real path via FUSE, and reading mount state. |
+| `github.com/sylvanld/airfs/sdk` | Package `airfs`: the model (`Kind`, `Kinds`), the precondition contract, exit codes. |
+| `.../sdk/layerfs` | The ordered read-only union, as a standard `fs.FS`. |
+| `.../sdk/sources` | Reading and resolving `sources.txt` into layers. |
+| `.../sdk/mount` | Exposing a view at a real path via FUSE, and reading mount state. |
 
 Every dependency is cgo-free, so a program embedding `airfs` still builds with
 `CGO_ENABLED=0`.

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sylvanld/airfs"
-	"github.com/sylvanld/airfs/mount"
-	"github.com/sylvanld/airfs/sources"
+	"github.com/sylvanld/airfs/sdk"
+	"github.com/sylvanld/airfs/sdk/mount"
+	"github.com/sylvanld/airfs/sdk/sources"
 )
 
 // serve mounts a target built from the given source list and returns the

@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sylvanld/airfs"
+	"github.com/sylvanld/airfs/sdk"
 )
 
 // DetachedEnv marks the re-executed child that actually serves the mounts. A

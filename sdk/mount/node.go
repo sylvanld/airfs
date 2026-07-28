@@ -10,7 +10,7 @@ import (
 
 	gofs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
-	"github.com/sylvanld/airfs/layerfs"
+	"github.com/sylvanld/airfs/sdk/layerfs"
 )
 
 // The mount reports every entry as owned by the invoking user, whose mount it

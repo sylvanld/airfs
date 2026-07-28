@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sylvanld/airfs"
-	"github.com/sylvanld/airfs/sources"
+	"github.com/sylvanld/airfs/sdk"
+	"github.com/sylvanld/airfs/sdk/sources"
 )
 
 // write creates a configuration file in a fresh target directory and returns

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/sylvanld/airfs/layerfs"
+	"github.com/sylvanld/airfs/sdk/layerfs"
 )
 
 // layer names an in-memory tree, which is a valid layer: the merge semantics

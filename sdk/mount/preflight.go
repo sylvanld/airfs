@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/sylvanld/airfs"
+	"github.com/sylvanld/airfs/sdk"
 )
 
 // A Requirement is one thing the host must provide for a mount to be possible.

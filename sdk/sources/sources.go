@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sylvanld/airfs"
-	"github.com/sylvanld/airfs/layerfs"
+	"github.com/sylvanld/airfs/sdk"
+	"github.com/sylvanld/airfs/sdk/layerfs"
 )
 
 // FileName is the configuration file's name at the root of a target.

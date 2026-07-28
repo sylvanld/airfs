@@ -1,5 +1,8 @@
 // Package airfs presents the resources of many repositories as one merged,
 // read-only view. See docs/specs/layered-resources.md for the model.
+//
+// It holds what every other package shares: the vocabulary of resource kinds,
+// and the failure protocol saying which failures a caller is meant to act on.
 package airfs
 
 // Kind is a category of resource, corresponding to one subdirectory name
