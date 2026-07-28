@@ -11,8 +11,8 @@ it.
 
 | Spec | Description | Status |
 | --- | --- | --- |
-| [layered-resources.md](layered-resources.md) | The core model: sources, resource kinds, precedence, shadowing | accepted |
-| [source-config.md](source-config.md) | Declaring sources: file location, format, path resolution, ordering | accepted |
-| [layered-fs.md](layered-fs.md) | Ordered read-only `fs.FS` union: lookup, listing, dedup, edge cases | accepted |
-| [fuse-mount.md](fuse-mount.md) | Serving the view as one read-only FUSE mount per kind, in pure Go | accepted |
-| [cli.md](cli.md) | The `airfs` command surface and its exit codes | accepted |
+| [layered-resources.md](layered-resources.md) | The core model: sources, resource kinds, precedence, shadowing | implemented |
+| [source-config.md](source-config.md) | Declaring sources: file location, format, path resolution, ordering | implemented |
+| [layered-fs.md](layered-fs.md) | Ordered read-only `fs.FS` union: lookup, listing, dedup, edge cases | implemented |
+| [fuse-mount.md](fuse-mount.md) | Serving the view as one read-only FUSE mount per kind, in pure Go | implemented |
+| [cli.md](cli.md) | The `airfs` command surface and its exit codes | implemented |

@@ -1,7 +1,7 @@
 SHELL := bash
 
 .DEFAULT_GOAL := help
-.PHONY: help check lint docs-serve docs-build docs-clean
+.PHONY: help check lint format test build docs-serve docs-build docs-clean
 
 DOCS := docs
 DOCS_PORT := 10000
@@ -17,10 +17,21 @@ help: ## List available targets
 	@echo
 	@echo "Setup and prerequisites: docs/contribute/index.md"
 
-check: lint ## Run every quality gate (what CI runs, and what to run before pushing)
+check: lint test ## Run every quality gate (what CI runs, and what to run before pushing)
 
-lint: ## Verify the docs indexes list every spec and how-to document
+lint: ## Verify formatting, vet the code, and check the docs indexes
 	@scripts/check-docs-index.sh
+	@scripts/check-gofmt.sh
+	@go vet ./...
+
+format: ## Rewrite Go files into their canonical formatting
+	@gofmt -l -w .
+
+test: ## Run the Go test suite
+	@go test ./...
+
+build: ## Build the airfs command into bin/
+	@go build -o bin/airfs ./cmd/airfs
 
 docs-serve: ## Open the documentation with live reload (port: DOCS_PORT, default 10000)
 	cd $(DOCS) && uv run zensical serve --open -a 127.0.0.1:$(DOCS_PORT)
