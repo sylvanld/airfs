@@ -1,2 +1,7 @@
 /airfs
 *.test
+
+# Documentation site build output and caches (make docs-clean)
+/docs/build/
+/docs/.cache/
+/.venv-docs/
