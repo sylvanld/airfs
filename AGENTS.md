@@ -38,6 +38,33 @@ says how to rely on it. `docs/get-started.md` is the one path through it that
 must stay working end to end; verify its commands against a real run rather than
 from memory.
 
+## Release notes live in `docs/changelog.md`
+
+One section per released version, newest first, titled with the tag and a short
+name for the release. Its body is what *changed* in that version, as a flat list
+of what a user gains or loses - no sub-headings to navigate, since a release is
+read top to bottom once.
+
+Write it as an announcement, not a diff: address the reader, say why an entry
+matters to them rather than only what it is, and let a leading blockquote carry
+the one-line pitch and a closing one carry the caveats and the link to what to
+read next, each opening on a bold sentence that stands in for its title. An emoji per entry is welcome - it makes a long list
+skimmable - but one, and only where it means something.
+
+This is the one document written in plain CommonMark rather than in the
+Markdown extensions the rest of `docs/` uses: a section of it gets pasted into
+a GitHub release page, which renders neither `!!!` admonitions nor `> [!NOTE]`
+alerts - a plain `>` blockquote is what carries an aside there. Same reason, links out of it are absolute URLs to the published site,
+not relative paths to other files - a relative link is dead once it leaves the
+site. Lines are not wrapped at 80 characters either, since a release page
+reflows them itself.
+
+A changelog entry does not repeat the documentation. Installation commands,
+usage, limitations, and anything a reader would still need next month belong in
+`docs/get-started.md` or `docs/user-guide/`; the entry links there instead of
+restating them. If a bullet would stay true forever, it is documentation that
+wandered into the wrong file.
+
 ## How-to lives in `docs/contribute/`
 
 Commands, tooling, setup, pre-push checks - one document per question, listed in
