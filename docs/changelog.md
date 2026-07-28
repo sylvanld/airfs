@@ -2,6 +2,16 @@
 
 All notable changes to `airfs` are documented here. Versions follow [semantic versioning](https://semver.org/).
 
+## v0.2.0 — a workspace in one command 🚀
+
+> **You no longer need a file before you can mount anything.** Until now, trying `airfs` at all meant opening an editor, writing a `sources.txt`, saving it in the right place, and only then mounting. That is a lot of ceremony to answer "what does this thing actually do?" — so now you can say what your layers are on the command line and be looking at the result a second later.
+
+- ⚡ **`airfs mount -s`, once per layer.** `airfs mount --target ~/scratch-ws -s ~/ai/personal -s ~/ai/project` creates the target, writes its `sources.txt`, and serves the view. The order you pass the flags in is the precedence order, most general first — same rule as the file, because it *is* the file.
+- ✍️ **What you typed is what gets written.** `~/ai/personal` stays `~/ai/personal` in the file instead of being frozen into `/home/you/...`, so the configuration you end up with is one you would have written by hand and can keep editing that way.
+- 🛑 **A typo cannot cost you your configuration.** `-s` replaces the file whole rather than appending to it — but the new list has to resolve first. Name a directory that is not there and you get exit `2` and the configuration you already had, untouched.
+
+> **It replaces, it does not add. 💥** Every layer you want has to be on the command line; whatever the file said before, comments and ordering included, is gone, and there is no backup. That is deliberate — a flag that appended would build a precedence order nobody wrote — but point it at a workspace you care about only once you have read [Declaring layers](https://sylvanld.github.io/airfs/user-guide/declaring-layers/).
+
 ## v0.1.0 — hello, world 🪄
 
 > **Many sources, one read-only view, no copies.** Your AI capabilities are scattered across repositories — personal, work, one per project — and every tool wants a single folder. Copy them together and each copy starts drifting from the day you made it. `airfs` gives you the folder without the copies.
