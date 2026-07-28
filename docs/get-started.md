@@ -21,17 +21,27 @@ airfs help
 !!! tip "No Go on this machine?"
 
     Every release ships a prebuilt binary for Linux and macOS on `amd64` and
-    `arm64` — no Go toolchain needed. Download the archive for your platform from
-    the [releases page](https://github.com/sylvanld/airfs/releases), unpack it,
-    and put `airfs` somewhere on your `PATH`:
+    `arm64`. One command picks the right one, checks it against the published
+    SHA-256, and installs it into `~/.local/bin` — no toolchain, no root:
 
     ```bash
-    tar -xzf airfs_<version>_linux_amd64.tar.gz
-    install -m 755 airfs ~/.local/bin/airfs
+    curl -fsSL https://raw.githubusercontent.com/sylvanld/airfs/main/scripts/get-airfs.sh | sh
     ```
 
-    Each release also publishes `checksums.txt`, so you can verify the download
-    with `sha256sum -c` before installing it.
+    Two environment variables change what it does:
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/sylvanld/airfs/main/scripts/get-airfs.sh \
+      | AIRFS_VERSION=v0.1.0 AIRFS_INSTALL_DIR=/usr/local/bin sh
+    ```
+
+    `AIRFS_VERSION` installs a specific release tag instead of the latest, and
+    `AIRFS_INSTALL_DIR` chooses where the binary lands — a system-wide directory
+    needs a `sudo` you type yourself, since the script never asks for one.
+
+    Prefer doing it by hand? The archives and their `checksums.txt` are on the
+    [releases page](https://github.com/sylvanld/airfs/releases); unpack the one
+    for your platform and `install -m 755 airfs ~/.local/bin/airfs`.
 
 ## 2. Check the host 🩺
 
