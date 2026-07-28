@@ -1,82 +1,92 @@
-# airfs 🪄
+# AiRFS 🪄
 
-**One directory. Many repositories. No copies.**
+**Assemble AI workspaces through a layered filesystem of reusable capabilities: many sources, one read-only view, no copies.**
 
-`airfs` layers AI resource directories — skills, agents, commands — from several
-repositories into a single **read-only merged view**, served as a FUSE mount
-written in pure Go. It ships as a Go SDK and a small CLI.
+**AiRFS** assembles isolated AI workspaces from reusable capabilities - skills,
+agents, commands, tools, and whatever comes next - each capability staying in the
+repository that owns it.
+
+One personal workspace, one work workspace, one workspace per project: each can
+reuse the same underlying capabilities while exposing only what is relevant to
+its context.
 
 📖 **[Documentation](https://sylvanld.github.io/airfs/)** ·
-📐 **[Specs](https://sylvanld.github.io/airfs/specs/)** ·
 🚀 **[Get started](https://sylvanld.github.io/airfs/get-started/)**
-
-> [!IMPORTANT]
-> **Specification stage.** The specs are `draft` and **no implementation exists
-> yet**. `airfs` replaces a `mergerfs`-based `Makefile` setup in
-> [ai-resources](https://github.com/hoshiyosan/ai-resources).
 
 ## The problem 🧩
 
-Your agent tooling wants every skill under one directory. But skills are authored
-in the repository that *owns* them — one per team, per product, per concern. The
-usual bridges rot: a **copy** drifts from the original, **hand-made symlinks**
-drift from the source list, and **`mergerfs`** is a system binary your
-distribution only packages with root.
+AI capabilities accumulate quickly. Skills, agents, commands, and tools live
+across personal, work, and project contexts, while agentic tools expect a single
+view of what is available. That leaves three bad options:
 
-## The idea ✨
+- **Scattered** - the tool sees only one of your contexts.
+- **Copied** - every copy drifts from the capability it came from.
+- **All of it, everywhere** - one flat pile that noises up every context.
 
-Don't move anything. Merge the directories **in place** and expose the result as
-a view. Each resource keeps living in — and is edited in — its own repository.
+## What an AiRFS workspace is ✨
+
+A workspace is an environment for AI capabilities - what a virtualenv is to
+Python packages, or a Nix profile to system tools. You declare the layers it is
+assembled from, in order:
 
 ```mermaid
 flowchart LR
-    A["📦 ai-resources<br/>skills/"]
-    B["📦 ai-tools<br/>skills/"]
-    C["📦 ai-maintainer<br/>skills/"]
-    M{{"🪄 airfs<br/>read-only merge"}}
-    V["👀 ~/.ai-resources/skills/<br/><i>merged view</i>"]
+    A["🧑 personal capabilities"]
+    B["🏢 organization capabilities"]
+    C["📦 project capabilities"]
+    D["🧪 temporary capabilities"]
+    M{{"🪄 airfs<br/>layered view"}}
+    V["👀 ~/.ai-resources/skills/<br/><i>the workspace</i>"]
 
     A --> M
     B --> M
     C --> M
+    D --> M
     M --> V
 ```
 
-Edit a file in its repository → the change is visible through the view
-immediately. No sync step, no copy to refresh. 🔄
+Nothing is moved and nothing is duplicated. Each capability keeps living in (and
+is edited in) its own repository; the workspace is a view onto them. Edit a file
+in its repository and the change is visible through every workspace that layers
+it, immediately - no sync step, no copy to refresh. 🔄
 
-## How the merge behaves 🥇
+Every workspace gets its own view, so the same capability can be shared by many
+workspaces without any of them seeing the others' layers.
 
-Sources are an **ordered** list, and that order *is* the precedence order. When
-two repositories both ship a skill named `commit`, the one declared **first**
-wins — and it wins *whole*, never half-assembled from two places.
+## How workspaces are composed 🥇
+
+Layers are an **ordered** list, and that order *is* the precedence order. When
+two layers both ship a skill named `commit`, the one declared **first** wins -
+and it wins *whole*, never half-assembled from two places.
 
 ```mermaid
 flowchart TB
-    subgraph S["Declared order — first wins"]
+    subgraph S["Declared order - first wins"]
         direction LR
         S1["1️⃣ ai-resources<br/>commit ✅<br/>review ✅"]
         S2["2️⃣ ai-tools<br/>commit ❌ shadowed<br/>deploy ✅"]
         S3["3️⃣ ai-maintainer<br/>audit ✅"]
     end
 
-    S --> R["👀 Merged view<br/>commit · review · deploy · audit"]
+    S --> R["👀 Workspace view<br/>commit · review · deploy · audit"]
 ```
 
 > [!TIP]
 > Shadowing is always reported, never silent. `airfs sources` lists every
-> shadowed entry with its winner and its losers — a silent shadow is what makes a
-> merged view untrustworthy. 🕵️
+> shadowed entry with its winner and its losers - a silent shadow is what makes a
+> workspace untrustworthy. 🕵️
 
-> [!WARNING]
-> The view is **read-only**. Writes are rejected, not routed to a source: a new
-> file in the merged view belongs to *some* repository and the view has no basis
-> to pick one. Edit in the source repo. ✍️
+> [!IMPORTANT]
+> The workspace view is intentionally **immutable**. Capabilities are edited in
+> the source layer that owns them, which is what keeps a workspace a
+> *declaration* of layers rather than a place where state quietly accumulates. A
+> new file in the view would belong to *some* repository, and the view has no
+> basis to pick one. ✍️
 
-## Two ways to expose it 🚪
+## Two ways to expose a workspace 🚪
 
-Both frontends read through the *same* merge, so the merge semantics are defined
-and tested once.
+Both frontends read through the *same* composition, so the layering semantics are
+defined and tested once.
 
 | | 🧵 FUSE mount | 🔗 Symlink farm |
 | --- | --- | --- |
@@ -85,7 +95,7 @@ and tested once.
 | **Needs** | `/dev/fuse` + setuid `fusermount3` | Nothing 🎒 |
 | **Use when** | You're on a normal Linux desktop | Prerequisites are unavailable |
 
-Not sure which you can use? Run **`airfs doctor`** — it checks the host and names
+Not sure which you can use? Run **`airfs doctor`** - it checks the host and names
 the package to install. 🩺
 
 ## Why pure Go 🐹
@@ -97,7 +107,7 @@ filesystem binary.
 
 > [!NOTE]
 > Two host requirements remain, because an unprivileged process cannot mount
-> without them: `/dev/fuse`, and a **setuid** `fusermount3` — which ships with the
+> without them: `/dev/fuse`, and a **setuid** `fusermount3` - which ships with the
 > system FUSE package and is already there on a normal desktop Linux. Where
 > neither is available, the symlink farm materialises the same view, trading the
 > kernel-enforced read-only guarantee for portability.
@@ -105,7 +115,7 @@ filesystem binary.
 ## Contributing 🤝
 
 > [!IMPORTANT]
-> No implementation change without an agreed spec — see [AGENTS.md](AGENTS.md).
+> No implementation change without an agreed spec - see [AGENTS.md](AGENTS.md).
 
 Run `make` for the available targets and `make check` before pushing. Setup,
 prerequisites, and what each gate verifies are documented under
