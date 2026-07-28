@@ -3,16 +3,15 @@
 ## Purpose
 
 The merged view, as an ordered read-only union of filesystem trees. This is the
-core of the SDK: every frontend — the FUSE mount, the symlink farm, any validator
-or indexer — reads through this one abstraction, so the merge semantics are
-defined and tested once.
+core of the SDK: the mount and any validator or indexer reads through this one
+abstraction, so the merge semantics are defined and tested once.
 
 ## Scope
 
 How a lookup and a directory listing resolve across an ordered stack of trees,
 and what happens at the edges. It does not cover where the stack comes from
 ([source-config.md](source-config.md)) or how the result is exposed to other
-processes ([fuse-mount.md](fuse-mount.md), [symlink-farm.md](symlink-farm.md)).
+processes ([fuse-mount.md](fuse-mount.md)).
 
 ## Interface
 
@@ -26,34 +25,37 @@ both are deliberate:
 - Anything that consumes a filesystem can consume the merged view directly,
   in-process, with no mount involved.
 
+One union is built per kind, over that kind's strata in declared order. A union
+knows nothing about kinds, targets, or configuration; it is the stack it was
+given.
+
 The union additionally exposes, for each name it resolves, which layer the name
-came from. Frontends need this: the symlink farm needs a real path to point at,
-the FUSE mount needs a backing file to read through to, and shadowing reports
-need to name the winner and the losers.
+came from. Frontends need this: the mount needs a backing file to read through
+to, and shadowing reports need to name the winner and the losers.
 
 ## Resolution
 
-**Lookup.** Layers are consulted in order and the first layer containing the name
-wins. Resolution stops there: later layers are not consulted, and the type of the
-winning entry is whatever that layer says it is. A name that is a directory in the
-first layer and a file in the second resolves as a directory, with no attempt to
-reconcile the disagreement.
+**Lookup.** Layers are consulted in reverse order and the last layer containing
+the name wins, per [layered-resources.md](layered-resources.md). The type of the
+winning entry is whatever that layer says it is: a name that is a directory in one
+layer and a file in a later one resolves as a file, with no attempt to reconcile
+the disagreement.
 
-**Listing.** A directory listing is the ordered merge of that directory's listing
-in every layer that has it, deduplicated by name, with the first occurrence
-winning. Iteration order is lexical by name — not layer order, and not the order
-any underlying filesystem happens to return — so that a listing is reproducible
-and diffable across machines. A directory that exists in no layer does not exist.
+**Listing.** A directory listing is the merge of that directory's listing in
+every layer that has it, deduplicated by name, with the last occurrence winning
+so that a listed name and a looked-up name always resolve to the same layer.
+Iteration order is lexical by name — not layer order, and not the order any
+underlying filesystem happens to return — so that a listing is reproducible and
+diffable across machines. A directory that exists in no layer does not exist.
 
-**Depth of merging.** Merging applies at every level of the tree, not only at the
-top. But at the entry granularity a kind declares, the winner wins whole: when a
-directory-granular entry resolves to a layer, that entry's subtree comes entirely
-from that layer, and no deeper merging happens inside it. This is the rule from
+**Depth of merging.** The union merges the root of the stack and stops there.
+Names directly under the root — the entries of a kind — resolve to exactly one
+layer, whether the name is a file or a directory, and a directory entry's subtree
+comes wholly from that layer with no deeper merging inside it. This is the rule
+from
 [layered-resources.md](layered-resources.md) expressed in the tree: kind
-directories merge, entries do not. A frontend that layers whole kind trees
-without knowing about kinds gets plain recursive merging; one that knows the
-granularity gets whole-entry semantics. The union supports being configured with
-the depth at which merging stops.
+directories merge, entries do not. There is no configurable depth; the entry is
+the unit, always.
 
 **Metadata.** Size, modification time, and mode come from the winning layer
 unchanged. Permissions are not rewritten, with one exception: write permission
@@ -62,15 +64,11 @@ file that rejects every write is worse than reporting the truth.
 
 ## Edge cases
 
-- **Symlinks within a layer** resolve within that layer, and a link that escapes
-  its layer's root is not followed. Following it would let a source repository
-  reach arbitrary paths on the machine through the merged view, which is both a
-  correctness problem and a disclosure problem.
+- **Symlinks within a layer** are ordinary entries and are served as the
+  underlying layer serves them.
 - **Dotfiles** are ordinary entries and are neither hidden nor filtered.
 - **Case** is treated as the underlying layer treats it. The union does not impose
-  case-insensitive matching, but two entries in the same directory whose names
-  differ only by case are reported as a collision when the platform cannot
-  distinguish them.
+  case-insensitive matching.
 - **An entry named identically in two layers with different types** is a
   shadowing event like any other, and is reported as one, because a directory
   shadowing a file is far more likely to be a mistake than an intention.
@@ -97,11 +95,11 @@ immutable.
 
 ## Shadowing report
 
-A union can enumerate every shadowed entry: the name, the kind directory it sits
-in, the winning layer, and the losing layers in order. The report is derived by
-walking to the merge depth and collecting names that appear in more than one
-layer. It is computed on demand rather than at construction, so that building a
-union stays cheap and no frontend pays for a report it does not use.
+A union can enumerate every shadowed entry: the name, the winning layer, and the
+losing layers in order. The report is derived by listing each layer's root and
+collecting names that appear in more than one. It is computed on demand rather
+than at construction, so that building a union stays cheap and no frontend pays
+for a report it does not use.
 
 ## Non-goals
 

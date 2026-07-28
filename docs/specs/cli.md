@@ -19,41 +19,58 @@ human-readable reporting, and exit codes — nothing else. Any behaviour it appe
 to add, another spec is missing.
 
 Every command resolves the configuration of
-[source-config.md](source-config.md), and takes the same overrides for the
-configuration file and the target path, so that an experiment against an
-alternative source list is one flag rather than an edited file.
+[source-config.md](source-config.md), and every command takes the same two
+overrides, so that an experiment against an alternative source list is one flag
+rather than an edited file:
+
+- `--target <dir>` — the directory the view is exposed under. Defaults to
+  `$HOME/.ai-resources`: the directory holding the configuration file and one
+  mounted subdirectory per kind. The target is a property of the frontend rather
+  than of the source list, so it is a default and an override, never a line in
+  the configuration file — the same sources may be exposed at more than one
+  target.
+- `--config <file>` — the configuration file to read. Defaults to `sources.txt`
+  inside the target. Overriding it does not move the target: the two are
+  independent, which is what allows one source list to be tried against a
+  scratch target, and one target to be rebuilt from an alternative list.
+
+Both accept a `~`-prefixed path, expanded as in
+[source-config.md](source-config.md). A relative `--target` or `--config`
+resolves against the current working directory, because it was written on the
+command line, where the working directory is the obvious frame of reference.
+Paths *inside* the configuration file are unaffected: they resolve against the
+directory containing that file, per
+[source-config.md](source-config.md), so a source list means the same thing
+wherever it is read from.
 
 ## Commands
 
 **`sources`** — resolve the configuration and report it: the ordered sources, the
-kinds each contributes, the entry count per stratum, and every shadowed entry with
-its winner and losers. Touches nothing. This is the command that answers "is my
-repository being layered, and where in the order?", and the shadowing report is
-what makes precedence debuggable rather than mysterious.
+entry count each contributes per kind, and every shadowed entry with its winner and
+losers. Touches nothing. This is the command that answers "is my repository being
+layered, and where in the order?", and the shadowing report is what makes
+precedence debuggable rather than mysterious.
 
-**`mount`** — serve the merged view at the target path per
+**`mount`** — serve the merged view under the target per
 [fuse-mount.md](fuse-mount.md), reporting the layers behind it. Blocks while
-serving, since the mount lives as long as the process; a detached mode exists for
-service managers and shell profiles, and reports how to stop it.
+serving, since the mount lives as long as the process; `--detach` returns once
+the view is ready and reports how to stop it, which is what a service manager or
+a shell profile needs.
 
-**`umount`** — release the mount, including recovering a stale mountpoint left by a
-serving process that died. Reports that nothing was mounted rather than failing.
+**`umount`** — release the target's mounts, including recovering a stale mountpoint
+left by a serving process that died. Reports that nothing was mounted rather than
+failing.
 
-**`status`** — report whether the target path is a live mount, a symlink farm, or
-neither, and what is visible through it. Distinguishing a live mount from a stale
-one matters here: a stale mountpoint looks mounted and serves nothing, and a
-contributor who cannot tell them apart cannot act.
-
-**`sync`** — reconcile the symlink farm per [symlink-farm.md](symlink-farm.md),
-reporting what changed. A verification mode makes no writes and exits non-zero if
-the farm has drifted, for use in CI.
+**`status`** — report whether the target is being served, and what is visible
+through it. Distinguishing a live mount from a stale one matters here: a stale
+mountpoint looks mounted and serves nothing, and a contributor who cannot tell them
+apart cannot act.
 
 **`doctor`** — check the host's mount prerequisites: `/dev/fuse`, and a setuid
 `fusermount3`. For each, report whether it is satisfied and, when it is not, which
-system package provides it and that `sync` is the frontend that needs neither.
-This exists as its own command because the requirements are the project's most
-likely first failure, and a mount error alone does not explain which requirement
-is missing or what to install.
+system package provides it. This exists as its own command because the
+requirements are the project's most likely first failure, and a mount error alone
+does not explain which requirement is missing or what to install.
 
 ## Reporting and exit codes
 
@@ -61,14 +78,30 @@ Output is for a person reading a terminal: the resolved state, then what changed
 Reports name sources by the path the configuration declared, not by a resolved
 symlink target.
 
-A machine-readable output mode is available for every reporting command, so that
-`status` and `sources` can be consumed by a script without parsing prose.
+There is no machine-readable output mode. A program that needs the merged view
+consumes the SDK, in-process and without parsing anything; adding a second,
+stringly-typed interface for the same data would be a contract to keep stable for
+no caller that could not do better.
 
-Exit codes distinguish the three outcomes a caller acts on differently: success;
-an unsatisfied precondition, such as a missing configuration, an unresolvable
-source, a foreign entry in a farm target, or an absent mount prerequisite; and
-drift detected by a verification mode. A verification mode's non-zero exit is not
-an error and must be distinguishable from one, because CI treats them differently.
+Exit codes are `0` for success, `2` for an unsatisfied precondition — a missing
+configuration, an unresolvable source, a non-empty mountpoint, an absent mount
+prerequisite — and `1` for everything else that failed. The precondition code is
+separate because it is the outcome a caller acts on differently: it means the host
+or the configuration needs attention, not that `airfs` malfunctioned.
+
+Two commands report a *state* rather than an outcome, and their codes say which
+state, so that a shell profile can branch without parsing prose:
+
+- `status` exits `0` when the target is fully served, and `2` when it is not —
+  nothing mounted, only some kinds mounted, or a mountpoint gone stale. Each of
+  those is a condition to act on, and each is named in the output.
+- `doctor` exits `0` when every prerequisite is satisfied and `2` when any is
+  missing. It reports every prerequisite either way, since the second missing one
+  is worth knowing before installing the first.
+
+Shadowing is not a failure. `sources` exits `0` with shadowed entries reported,
+because shadowing is the mechanism working, and an exit code that punished it
+would make the normal case indistinguishable from a broken configuration.
 
 ## Non-goals
 
@@ -79,6 +112,6 @@ an error and must be distinguishable from one, because CI treats them differentl
   should have printed the command instead.
 - Managing source repositories: cloning, pulling, or reporting their git state.
 - Supervision. Keeping a mount alive across reboots belongs to the host's service
-  manager; the SDK provides no daemon of its own.
+  manager; the SDK provides no daemon of its own beyond detaching one.
 - Authoring or validating resources. `airfs` layers directories; it does not know
   what a skill is.
