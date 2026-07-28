@@ -1,0 +1,13 @@
+[project]
+name = "docs"
+version = "0.1.0"
+description = "Documentation for AirFS"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mike",
+    "zensical>=0.0.51",
+]
+
+[tool.uv.sources]
+mike = { git = "https://github.com/squidfunk/mike.git" }
