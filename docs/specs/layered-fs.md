@@ -10,8 +10,8 @@ abstraction, so the merge semantics are defined and tested once.
 
 How a lookup and a directory listing resolve across an ordered stack of trees,
 and what happens at the edges. It does not cover where the stack comes from
-([source-config.md](source-config.md)) or how the result is exposed to other
-processes ([fuse-mount.md](fuse-mount.md)).
+([workspace-config.md](workspace-config.md)) or how the result is exposed to
+other processes ([fuse-mount.md](fuse-mount.md)).
 
 ## Interface
 
@@ -25,9 +25,9 @@ both are deliberate:
 - Anything that consumes a filesystem can consume the merged view directly,
   in-process, with no mount involved.
 
-One union is built per kind, over that kind's strata in declared order. A union
-knows nothing about kinds, targets, or configuration; it is the stack it was
-given.
+One union is built per folder of a workspace, over that folder's strata in
+declared order. A union knows nothing about folders, workspaces, targets, or
+configuration; it is the stack it was given.
 
 The union additionally exposes, for each name it resolves, which layer the name
 came from. Frontends need this: the mount needs a backing file to read through
@@ -49,11 +49,11 @@ underlying filesystem happens to return — so that a listing is reproducible an
 diffable across machines. A directory that exists in no layer does not exist.
 
 **Depth of merging.** The union merges the root of the stack and stops there.
-Names directly under the root — the entries of a kind — resolve to exactly one
+Names directly under the root — the entries of a folder — resolve to exactly one
 layer, whether the name is a file or a directory, and a directory entry's subtree
 comes wholly from that layer with no deeper merging inside it. This is the rule
 from
-[layered-resources.md](layered-resources.md) expressed in the tree: kind
+[layered-resources.md](layered-resources.md) expressed in the tree: folder
 directories merge, entries do not. There is no configurable depth; the entry is
 the unit, always.
 

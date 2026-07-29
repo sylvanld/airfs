@@ -9,21 +9,26 @@ in-process view visible to an unrelated process at a path.
 
 ## Scope
 
-Serving read-only filesystems, including but not limited to the per-kind unions
-of [layered-fs.md](layered-fs.md), as FUSE mounts: what a mount guarantees, what
-it requires of the host, and how it starts and stops.
+Serving read-only filesystems, including but not limited to the per-folder
+unions of [layered-fs.md](layered-fs.md), as FUSE mounts: what a mount
+guarantees, what it requires of the host, and how one starts and stops. Which
+mounts should exist, and what establishes them, is [daemon.md](daemon.md).
 
 ## Shape
 
-One mount per kind. The target directory holds one subdirectory per kind —
-`<target>/skills`, `<target>/agents`, `<target>/commands`, `<target>/scripts` —
-and each of those is a mountpoint serving that kind's union. The target itself is
-an ordinary directory and is never mounted over, which is what keeps
-`<target>/sources.txt` readable while the view is live.
+One mount per folder of a workspace. The target directory holds one subdirectory
+per declared folder — `<target>/skills`, `<target>/agents`, and whatever else the
+workspace names — and each of those is a mountpoint serving that folder's union.
+The target itself is an ordinary directory and is never mounted over.
 
-All of a target's mounts are served by one process. They are established together
-and released together: a target is either serving or not, since a partially
-mounted target is a view that lies about what is available.
+A workspace's mounts are established together and released together: a workspace
+is either serving or not, since a partially mounted workspace is a view that lies
+about what is available.
+
+Every mount on the machine, across every workspace, is served by one process, per
+[daemon.md](daemon.md). Nothing about a mount depends on that — a mount is
+identical whichever process holds it — but it is why this spec describes a mount
+rather than a lifetime.
 
 ## Pure Go, no install step beyond `go install`
 
@@ -89,23 +94,28 @@ mounts, and nothing may depend on that.
 
 ## Lifecycle
 
-Mounting takes a target and the resolved sources. Missing kind directories under
-the target are created. A kind directory that exists and is not empty is refused,
-because mounting over populated directories hides their contents and the hidden
-files are a trap; a target already serving this view is detected and reported
-rather than stacked. If any kind fails to mount, every kind already mounted for
-that target is released before reporting, so a failed attempt leaves nothing
-behind.
+Establishing a workspace takes its target, its folders, and its resolved sources.
+The target and its missing folder directories are created. A folder directory
+that exists and is not empty is refused, because mounting over populated
+directories hides their contents and the hidden files are a trap; a folder
+already serving this view is detected and reported rather than stacked. If any
+folder fails to mount, every folder already mounted for that workspace is
+released before reporting, so a failed attempt leaves nothing behind.
 
-Unmounting releases every mount under the target and is safe to invoke when
-nothing is mounted, reporting that fact rather than failing.
+Releasing a workspace unmounts every folder under its target, and is safe to
+invoke when nothing is mounted, reporting that fact rather than failing.
 
-**Finding a mount holds no state.** Whether a target is served, and by what, is
+**Finding a mount holds no state.** Whether something is served, and where, is
 read from the kernel's mount table: `airfs` sets a recognisable filesystem name at
-mount time and looks for it against the kind directories. There is no PID file and
-no runtime directory, because a second record of what is mounted would disagree
-with the kernel exactly when it matters — after a crash, or after a manual
-`fusermount3 -u`.
+mount time, and every mount bearing it is an `airfs` mount. There is no PID file
+and no registry, because a second record of what is mounted would disagree with
+the kernel exactly when it matters — after a crash, after a manual
+`fusermount3 -u`, or after the configuration changed while nothing was running.
+
+This is also what lets every `airfs` mount on the machine be enumerated without
+knowing which configuration produced it, which is what
+[daemon.md](daemon.md) reconciles against. The kernel is the inventory; the
+configuration is the intent.
 
 A mount whose serving process has died leaves a stale mountpoint: still listed by
 the kernel, but failing every access with the error a severed FUSE connection
@@ -114,19 +124,9 @@ ordinary directory, and unmounting recovers it. Recovering from that state is pa
 of this spec's surface, not something a contributor should be expected to fix with
 manual commands.
 
-Serving runs in the foreground by default and can detach, so that a target can be
-kept mounted for a login session or supervised as a long-running daemon. Detaching
-re-executes the serving process in its own session and returns once the mounts are
-established, so a caller that succeeds knows the view is ready. A detached process
-is managed exactly like a foreground one — it is found through the kernel and
-released by unmounting — so no handle has to be kept anywhere.
-
-The mount lives as long as the process serving it. It does not survive a reboot,
+A mount lives as long as the process serving it. It does not survive a reboot,
 and re-establishing it at login is left to the host's service manager; the SDK
-provides no supervision of its own.
-
-Interrupting the serving process unmounts cleanly. Termination that does not
-allow cleanup is the stale-mountpoint case above.
+supervises nothing.
 
 ## Non-goals
 
@@ -134,7 +134,8 @@ allow cleanup is the stale-mountpoint case above.
 - Mounting for other users, system-wide mounts, or anything requiring root.
 - Performance tuning: caching layers, readahead, or attribute caching beyond what
   correctness requires. Freshness wins every time it conflicts with throughput.
-- Supervision, auto-remount, or reboot persistence. Detaching starts a daemon; it
-  does not keep one alive.
+- Supervision, auto-remount, or reboot persistence. A mount is held by a process
+  and dies with it; keeping that process alive is [daemon.md](daemon.md)'s
+  concern, and keeping it alive across reboots is the host's.
 - Non-Linux hosts. The mechanism is Linux FUSE; macOS would require a third-party
   kernel extension, which is exactly the class of dependency this design removes.

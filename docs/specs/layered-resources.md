@@ -3,8 +3,9 @@
 ## Purpose
 
 AI agent tooling expects to find its resources — skills, agents, commands,
-scripts — under one directory per kind. In practice those resources are authored
-in several different git repositories, each of which owns its own subset. Copying
+prompts — under one directory per category, and different tools expect different
+categories under different names. In practice those resources are authored in
+several different git repositories, each of which owns its own subset. Copying
 them into one place drifts from the originals; hand-made symlinks drift from the
 source list.
 
@@ -16,9 +17,10 @@ edited in — the repository that owns it.
 
 This spec defines the vocabulary and the precedence model that every other spec
 builds on. It does not define the configuration file format
-([source-config.md](source-config.md)), the merge algorithm
-([layered-fs.md](layered-fs.md)), or how the view is exposed
-([fuse-mount.md](fuse-mount.md)).
+([workspace-config.md](workspace-config.md)), the merge algorithm
+([layered-fs.md](layered-fs.md)), how the view is exposed
+([fuse-mount.md](fuse-mount.md)), or what establishes it
+([daemon.md](daemon.md)).
 
 ## Vocabulary
 
@@ -27,32 +29,40 @@ copy. Sources are an *ordered* list; the order is the precedence order. When the
 stack rather than the individual tree is meant, the same thing is called a
 *layer*.
 
-**Kind** — a category of resource, corresponding to one subdirectory name within
-a source. The kinds are fixed and built into `airfs`: `agents`, `skills`,
-`commands`, `scripts`. They are not configurable, and no other top-level
-directory of a source participates in the view — which is what keeps a
-repository's documentation, CI configuration and own tooling out of it.
+**Folder** — one subdirectory name that is merged and exposed, shared by the
+sources and the target: `<source>/<folder>/` is merged and served at
+`<target>/<folder>/`. Which folders a workspace carries is declared per
+workspace, so that a workspace serving a tool that expects `prompts/` and one
+serving a tool that expects `skills/` can be built from the same sources. No
+other directory of a source participates, which is what keeps a repository's
+documentation, CI configuration and own tooling out of the view.
 
-Every source contributes every kind. A source that lacks a kind's subdirectory
-has it created, empty, so that the stack is uniform and adding a resource of a
-new kind to a repository is a `mkdir`-free act. This is the only write `airfs`
-performs against a source, and an empty directory is invisible to git, so it
-produces no diff.
+`airfs` attaches no meaning to a folder name. It merges the directory called
+what you called it, and folders differ only in name.
 
-**Entry** — one resource within a kind, identified by the name it presents
-directly under that kind. An entry may be a directory — a skill is a directory
+A source that lacks one of the workspace's folders contributes nothing to it.
+The directory is **not** created: `airfs` performs no write against a source.
+
+**Entry** — one resource within a folder, identified by the name it presents
+directly under that folder. An entry may be a directory — a skill is a directory
 containing `SKILL.md` and its supporting files — or a single file, since agent
 tooling commonly stores a command or an agent as one Markdown document. Which of
 the two it is comes from the source; `airfs` imposes neither. The entry is the
 unit that collides and the unit that is shadowed, and it is always the *whole*
 name: a directory entry wins with its entire subtree.
 
-**Stratum** — one source's contribution to one kind: the `<source>/<kind>/`
-directory. A kind's merged view is the ordered stack of its strata.
+**Stratum** — one source's contribution to one folder: the
+`<source>/<folder>/` directory. A folder's merged view is the ordered stack of
+its strata.
 
-**Target** — the directory the merged view is exposed under, holding one
-subdirectory per kind. The target is not a mountpoint; each of its kind
-directories is.
+**Target** — the directory a workspace's merged view is exposed under, holding
+one subdirectory per folder and nothing else. The target is not a mountpoint;
+each of its folder directories is.
+
+**Workspace** — a named target, an ordered list of sources, and the folders it
+carries. It is the unit that is declared, established, and reported on; a
+machine has as many as its configuration names, and they are independent of one
+another.
 
 **Shadowing** — when two or more strata contain an entry with the same name, the
 entry from the *last* source in the order wins and is the only one visible. The
@@ -75,8 +85,8 @@ others are said to be *shadowed*.
    that exists in no repository and that nobody can test. An entry that is a
    directory in one stratum and a file in another still resolves to exactly one
    of them — the last — with no reconciliation attempted.
-3. Precedence is independent per kind. A source may win `commit` under `skills`
-   while losing `commit` under `commands`.
+3. Precedence is independent per folder. A source may win `commit` under
+   `skills` while losing `commit` under `commands`.
 4. Shadowing is reported, never silent. Any operation that builds a merged view
    can enumerate the shadowed entries, with the winning and losing source for
    each. Silent shadowing is the failure mode that makes a merged view
@@ -102,15 +112,15 @@ an entry does not.
 
 ## Non-goals
 
-- Writing through to sources, and any write policy that would pick a destination
-  branch. The one exception is creating a source's missing kind directories,
-  which adds no content.
-- Configurable kinds. The set is fixed; a repository opts out of a kind by
-  leaving that directory empty.
+- Writing to a source at all, whether content or an empty directory, and any
+  write policy that would pick a destination branch.
 - Merging the *contents* of two colliding entries — appending sections, resolving
   frontmatter, or taking a union of a directory's files.
+- Selecting a subset of a source's entries. A source contributes every entry of
+  every folder the workspace declares; curation is which sources a workspace
+  layers, not which entries survive the layering.
 - Understanding what a resource means. `airfs` layers directories; it does not
   parse `SKILL.md`, validate frontmatter, or know which fields an agent
-  definition needs. Kinds differ only in name.
+  definition needs. Folders differ only in name.
 - Fetching, cloning, or updating sources. A source is a directory that already
   exists on disk; keeping it current is git's job.

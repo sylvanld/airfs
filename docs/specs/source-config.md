@@ -1,119 +1,44 @@
 # Source configuration
 
-## Purpose
+> **Superseded by [workspace-config.md](workspace-config.md).**
+>
+> This spec placed one `sources.txt` at the root of each target: a target carried
+> its own declaration, and a second workspace was a second folder with its own
+> file. It is kept for history, and because the code implementing it is what
+> [workspace-config.md](workspace-config.md) replaces.
 
-Declare which sources contribute to the merged view and in what precedence
-order. The configuration is the only input that decides what appears in the view,
-so it must be readable at a glance, diffable, and reviewable in the same way as
-the resources it points at.
+## Why it was superseded
 
-## Scope
+Three properties of this design did not survive contact with more than one
+workspace:
 
-The configuration file's location and format, how paths in it are resolved, and
-how the resolved result is reported. The precedence model itself is
-[layered-resources.md](layered-resources.md).
+**No inventory.** A declaration that lives inside the thing it produces can only
+be found by already knowing where to look. There was no way to ask what `airfs`
+did on a machine short of walking the filesystem for `sources.txt` files, and no
+single artifact to review in git.
 
-## Location
+**Fixed kinds.** `agents`, `skills`, `commands` and `scripts` were built in and
+not configurable, on the reasoning that a repository opts out of a kind by
+leaving it empty. That holds for opting out and not for opting in: a tool
+expecting `prompts/` could not be served at all. Folders are now declared per
+workspace.
 
-The configuration is `sources.txt` at the root of the target directory — the
-resource folder itself, alongside the kind directories, not inside them. A target
-therefore carries its own definition: the folder and the declaration that
-produced it travel together, and a second target is a second folder with its own
-file rather than a section in a shared one.
+**Writing into sources.** Resolution created a source's missing kind
+subdirectories, so that every source contributed every kind and the stack was
+uniform. It meant a read-only command wrote empty directories into every
+repository it was pointed at, and with folder names now arbitrary it would
+scatter directories nobody asked for. Resolution no longer writes to a source at
+all; a source lacking a folder contributes nothing to it.
 
-The file is never masked by a mount, because the mountpoints are the kind
-directories one level below it.
+What did survive, and is carried into
+[workspace-config.md](workspace-config.md) unchanged: the path expansion rules
+(`~`, `$VAR` with an unset variable being an error, relative paths resolving
+against the file's own directory), duplicate sources being an error rather than
+silently collapsed, and sources being named explicitly rather than discovered.
 
-Both the target and the configuration file within it can be overridden per
-invocation; see [cli.md](cli.md).
-
-The file is normally authored by hand. It can also be produced whole from a
-command line, in which case what is written down is what was typed, in the order
-it was typed, and the file it replaces is gone — see [cli.md](cli.md).
-
-## Format
-
-A line-oriented plain text file whose meaningful lines are an ordered list of
-source paths, and nothing else. Line orientation is chosen over a structured
-format because that ordered list is the file's entire content, which a
-line-oriented file expresses with no syntax at all, and because its most common
-diff is a one-line addition.
-
-Each meaningful line declares one source: a path to a directory that contains, or
-will be given, the kind subdirectories. The path points at the source root, not
-at a kind directory inside it. Order is from the most general source to the most
-specific, since the last declaration wins.
-
-Recognised on every line, in this order:
-
-1. A `#` begins a comment, which runs to end of line. A line that is empty or
-   comment-only declares nothing.
-2. Surrounding whitespace is insignificant.
-3. A leading `~` expands to the invoking user's home directory.
-4. `$VAR` and `${VAR}` expand from the environment. An unset variable is an
-   error, not an empty string: silently resolving to a shorter path, or to the
-   target directory, would layer something nobody declared.
-5. A path that is not absolute after expansion resolves relative to the
-   directory containing the configuration file, never to the current working
-   directory. The file must mean the same thing regardless of where the command
-   was invoked from, and — when the file is read from somewhere other than the
-   target — regardless of which target it is being applied to. In the default
-   case the two coincide, since the file lives at the target's root.
-
-There is no other directive. Kinds are fixed and built in, so they are not
-declared here.
-
-## Resolution
-
-Resolving a configuration yields the ordered list of sources and, for each, the
-strata it contributes.
-
-- Order is preserved exactly as written. Duplicate paths after expansion are an
-  error rather than a silently collapsed entry, because a duplicate means the
-  author believes the file says something it does not.
-- A declared source whose directory does not exist is an error. A configuration
-  that points at nothing is a mistake worth stopping for, and the alternative —
-  proceeding with a view that is quietly missing a repository's resources — is
-  the harder failure to diagnose.
-- A source that exists but lacks a kind's subdirectory has it created, empty, per
-  [layered-resources.md](layered-resources.md). The stratum then exists and
-  contributes no entries.
-- A kind for which no source contributes an entry yields an empty kind, not an
-  error.
-- Resolution performs no I/O beyond confirming that the source directories exist
-  and creating the missing kind subdirectories. Enumerating entries is the
-  merge's job.
-
-Symlinked source paths are followed, and the resolved source is recorded as the
-path the author wrote, not its target. Reports name what the author would
-recognise.
-
-## Reporting
-
-The resolved configuration is inspectable without building a view: the ordered
-sources, each with the number of entries it contributes per kind, and the kinds
-that ended up empty. Counting entries enumerates the strata, which is the merge's
-work rather than resolution's, and is done on demand by the command that reports.
-This is what a contributor consults to answer "is my repository being layered,
-and where in the order?" — the question that precedence makes inevitable and that
-guessing answers badly.
-
-Entry-level shadowing is reported by the merge, not here, since it requires
-comparing entries across strata.
-
-## Non-goals
-
-- Declaring where the view is exposed. The configuration says what is layered and
-  in what order; the target is the frontend's, and lives in [cli.md](cli.md).
-- Per-source kind subsets, or an order that differs by kind. One order, one kind
-  set; a repository that should not contribute a kind leaves that kind's
-  directory empty.
-- Globs or recursive discovery of sources. Each source is named explicitly, so
-  that adding one is a reviewable diff rather than a consequence of where a
-  directory happens to sit.
-- Cloning or updating source repositories.
-- Any configuration format beyond this file — no environment-variable source
-  lists, and no command-line source list that *accumulates* into this one. A
-  command line may replace the file's entire content, per [cli.md](cli.md),
-  which leaves this file as the single declaration of what is layered; nothing
-  merges into it, and no second place holds part of the answer.
+`mount --source`, which replaced a target's whole source list from the command
+line, survives as `airfs add` in [cli.md](cli.md) — with its replace-never-merge
+rule and its path-writing rules intact. What it loses is the verb: it declared a
+workspace and served it under one word, which was defensible when the file it
+rewrote described exactly the thing being mounted, and is not now that mounts
+are established by a daemon reconciling a file that describes the machine.
