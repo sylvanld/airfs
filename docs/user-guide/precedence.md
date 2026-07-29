@@ -10,7 +10,7 @@ how to see it.
 
 ```mermaid
 flowchart TB
-    subgraph S["sources.txt — declared order"]
+    subgraph S["config.yaml — declared order"]
         direction LR
         S1["1️⃣ personal<br/>commit ❌<br/>review ✅"]:::mix
         S2["2️⃣ organization<br/>deploy ✅"]:::win
@@ -30,8 +30,8 @@ definition beats the global one", which is what you want it to mean.
 
 ## What "whole" means 🧱
 
-The unit of collision is the **entry**: the name that sits directly under a kind
-directory. When an entry is shadowed, the winner supplies *all* of it.
+The unit of collision is the **entry**: the name that sits directly under a
+folder. When an entry is shadowed, the winner supplies *all* of it.
 
 Suppose `personal` and `project` both have a `commit` skill:
 
@@ -52,32 +52,33 @@ from the layer; `airfs` imposes neither. A name that is a directory in one layer
 and a file in another still resolves to exactly one of them — the last — with no
 reconciliation attempted.
 
-## Precedence is per kind 🏷️
+## Precedence is per folder 🏷️
 
-Each kind is merged independently. A layer can win `commit` under `skills` while
-losing `commit` under `commands`. There is one ordering — the file's — applied
-four times.
+Each folder a workspace declares is merged independently. A source can win
+`commit` under `skills` while losing `commit` under `commands`. There is one
+ordering — the workspace's — applied once per folder.
 
 ## Seeing it 🔍
 
 Shadowing is only dangerous when it is silent: you edit a file, nothing changes
-in the view, and nothing tells you why. So `airfs sources` names every shadowed
+in the view, and nothing tells you why. So `airfs inspect` names every shadowed
 entry with its winner and its losers:
 
 ```bash
-airfs sources
+airfs inspect personal
 ```
 
 ```
-target  /home/you/.ai-resources
-config  /home/you/.ai-resources/sources.txt
+workspace  personal
+target     ~/.ai-resources
+folders    agents, skills, commands
 
 Sources, in precedence order — the last declaration wins:
-  1. ~/ai/personal    agents 0  skills 2  commands 0  scripts 0
-  2. $WORK/platform   agents 0  skills 0  commands 1  scripts 0
-  3. ~/ai/project     agents 0  skills 2  commands 0  scripts 0
+  1. ~/ai/personal    agents 0  skills 2  commands 0
+  2. $WORK/platform   agents 0  skills 0  commands 1
+  3. ~/ai/project     agents 0  skills 2  commands 0
 
-Empty kinds: agents, scripts
+Empty folders: agents
 
 Shadowed entries — the winner is what the view serves:
   skills/commit  wins ~/ai/project  over ~/ai/personal
@@ -88,29 +89,29 @@ Read it as three answers:
 - **The order** — is my repository being layered, and where?
 - **The counts** — is it contributing what I think it is? A `skills 0` next to a
   repository you know has skills means the path is wrong, or the resources are
-  not under a kind directory.
+  not under a folder this workspace declares.
 - **The shadowing** — which entries are contested, and who is winning.
 
-Layers are named by the path **you declared**, not by a resolved symlink target,
+Sources are named by the path **you declared**, not by a resolved symlink target,
 so the report matches your file line for line.
 
 !!! success "Shadowing is not an error"
 
-    `airfs sources` exits `0` with shadowed entries reported. Shadowing is the
+    `airfs inspect` exits `0` with shadowed entries reported. Shadowing is the
     mechanism working — an exit code that punished it would make the normal case
     indistinguishable from a broken configuration. When nothing is contested, the
     report says `Nothing is shadowed.`
 
 ## Changing who wins ✍️
 
-There is exactly one lever: **the order of the lines**. Move a layer later to
-give it precedence, earlier to yield it. Nothing else — no priority number, no
+There is exactly one lever: **the order of the `sources` list**. Move a source
+later to give it precedence, earlier to yield it. Nothing else — no priority number, no
 per-entry override, no exclusion list — because a second mechanism would make
 "which one is served?" a question with two places to look.
 
 If you want a project's `commit` skill to lose to your personal one, move your
-personal layer below it. If you want to stop shipping an entry entirely, remove
-it from the layer that ships it — in that repository, where it is reviewed.
+personal source below it. If you want to stop shipping an entry entirely, remove
+it from the source that ships it — in that repository, where it is reviewed.
 
 ## Why not merge content? 🤔
 
@@ -120,3 +121,10 @@ from one repository and a helper script from another produces something that
 exists in no repository, is tested nowhere, and cannot be reproduced by reading
 either one. Winning whole keeps every served entry identical to an entry that
 someone actually authored, reviewed, and can find in git.
+
+!!! tip "`inspect` says what *should* be there; `status` says what *is*"
+
+    `airfs inspect` reads your declaration and the source repositories — it needs
+    no daemon and tells you what the merge produces. `airfs status` reads the
+    kernel and tells you what is mounted right now. When the two disagree, that
+    difference is the diagnosis. 🔎

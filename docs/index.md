@@ -2,9 +2,12 @@
 
 **One directory. Many repositories. No copies.** 🪄
 
-`airfs` is a Go SDK — and a small CLI — that layers AI resource directories
-(agents, skills, commands, scripts) from several repositories into a single
-**read-only merged view**, served as a FUSE mount written in pure Go.
+`airfs` is a Go SDK — and a small CLI — that layers AI resource directories from
+several repositories into a single **read-only merged view**, served as a FUSE
+mount written in pure Go.
+
+Every workspace on your machine is declared in **one file** and held by **one
+daemon**, so "what is `airfs` doing here?" has one answer you can read and diff.
 
 ---
 
@@ -66,31 +69,30 @@ Five words carry the whole model.
     One contributing directory tree — normally a git working copy. Sources are an
     **ordered** list, and that order *is* the precedence order.
 
--   **🏷️ Kind**
+-   **🏷️ Folder**
 
-    A category of resource = one subdirectory name: `agents`, `skills`,
-    `commands`, `scripts`. The set is fixed and built in, so unrelated top-level
-    directories can never leak into the view.
+    A subdirectory name that gets merged and mounted — `skills`, `prompts`,
+    whatever you declare. **`airfs` attaches no meaning to any of them**: it
+    merges the directory called what you called it, and creates none of them
+    inside a source.
 
 -   **📄 Entry**
 
-    One resource inside a kind, named directly under it — a directory like a
+    One resource inside a folder, named directly under it — a directory like a
     skill, or a single file like a command. The entry is what collides and what
     gets shadowed, and it is shadowed *whole*.
 
--   **🥞 Stratum**
-
-    One source's contribution to one kind — `<source>/<kind>/`. A kind's view is
-    the ordered stack of its strata.
-
 -   **🎯 Target**
 
-    The resource folder the view lives under — `~/.ai-resources` by default. It
-    holds the configuration file and one mounted subdirectory per kind.
+    The directory a workspace's merged view is exposed under. It holds one
+    mountpoint per folder, and nothing else.
+
+-   **🪟 Workspace**
+
+    One named declaration — a target, an ordered list of sources, and the folders
+    to merge. It is the unit everything is reported and controlled by.
 
 </div>
-
----
 
 ## 🥇 Precedence: latest source wins
 
@@ -115,12 +117,12 @@ flowchart TB
     classDef out fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#0d47a1
 ```
 
-Precedence is **independent per kind**: a source can win `commit` under `skills`
-while losing `commit` under `commands`.
+Precedence is **independent per folder**: a source can win `commit` under
+`skills` while losing `commit` under `commands`.
 
 !!! tip "Shadowing is always reported, never silent"
 
-    `airfs sources` lists every shadowed entry with its winner and its losers.
+    `airfs inspect` lists every shadowed entry with its winner and its losers.
     A silent shadow is the failure mode that makes a merged view untrustworthy —
     you edit a file, nothing happens, and nothing tells you why. 🕵️
 
@@ -136,72 +138,110 @@ while losing `commit` under `commands`.
 
 ## 🚪 How the view is exposed
 
-One FUSE mount **per kind**, all served by one process:
+One FUSE mount **per folder**, and one daemon holding every workspace on the
+machine:
 
 ```
-~/.ai-resources/
-  sources.txt     # the ordered layers — never masked by a mount
-  agents/         # mountpoint
-  skills/         # mountpoint
-  commands/       # mountpoint
-  scripts/        # mountpoint
+~/.ai-resources/        # a target holds mountpoints, and nothing else
+  agents/               # mountpoint
+  skills/               # mountpoint
+  commands/             # mountpoint
 ```
 
-`airfs mount` establishes them together and blocks while serving; `--detach` runs
-it as a daemon instead. `airfs umount` releases them — including a stale
-mountpoint left behind by a serving process that died.
+`airfs up` starts the daemon and serves every enabled workspace; `--detach` gives
+your terminal back. `airfs down` stops it and releases **every** `airfs` mount on
+the machine — including ones a previous daemon left, and ones whose serving
+process died.
 
 Mounting needs `/dev/fuse` and a setuid `fusermount3`, both of which ship with
 your distribution's FUSE package. Not sure you have them? Run **`airfs doctor`** —
 it checks the host and names the package to install. 🩺
 
----
+## 🔁 The daemon does exactly one thing
+
+**Reconciliation**: make what is mounted match what is declared. It runs at
+startup and on reload, and it is idempotent.
+
+Its two inputs are your configuration and **every `airfs` mount the kernel
+reports** — not just the ones under a target you currently declare. That is what
+lets one command account for everything on the host, and it comes from the kernel
+rather than a file `airfs` keeps, because a file `airfs` keeps disagrees with
+reality exactly when it matters: after a crash, after a manual unmount, after you
+edited the config while nothing was running.
+
+> **The kernel is the inventory; the configuration is the intent.** 🗝️
+
+A workspace that cannot be established — a source that is not there, a non-empty
+mountpoint — **fails alone**. One mistyped path in one workspace never takes down
+the rest. 🛡️
 
 ## ⚙️ Configuring it
 
-One plain-text file at the root of the target, one path per line. The most common
-diff is a single added line.
+One YAML file at `~/.config/airfs/config.yaml`, describing the whole machine:
 
-```bash
-# ~/.ai-resources/sources.txt — order is precedence, last wins
-~/sylvan/ai-resources      # 1st — global
-~/sylvan/ai-tools          # 2nd
-$WORK/ai-maintainer        # 3rd — wins every collision
+```yaml
+workspaces:
+  personal:
+    target: ~/.ai-resources
+    folders: [agents, skills, commands]
+    sources:
+      - ~/repos/personal-capabilities   # 1st — most general
+      - ~/repos/org-capabilities        # 2nd — wins every collision
+
+  work:
+    target: ~/work/.ai-resources
+    folders: [skills, prompts]
+    sources:
+      - ~/repos/org-capabilities
+      - ~/work/project-capabilities
 ```
 
-Comments, `~`, and `$VAR` are expanded; relative paths resolve against the
-config file's own directory, never the working directory. An unset variable or a
-missing source directory is an **error**, not a shrug — a view quietly missing a
-repository is the harder failure to diagnose. 🚧
+`~` and `$VAR` are expanded; relative paths resolve against the config file's own
+directory, never the working directory. An unset variable is an **error**, not a
+shrug — a view quietly missing a repository is the harder failure to diagnose. 🚧
 
----
+You can write it by hand or let commands edit it: **comments, key order, anchors
+and aliases survive an edit.** ✍️
 
 ## 🛠️ The commands
 
-| Command | Does |
-| --- | --- |
-| `sources` 🔍 | Resolve the config and report it: order, counts per kind, shadowing. Touches nothing. |
-| `mount` 🧵 | Serve the merged view under the target, one mount per kind. `--detach` to daemonise. |
-| `umount` 🧹 | Release the mounts, including stale ones. |
-| `status` 📊 | Whether the target is served, live or stale — and what's visible through it. |
-| `doctor` 🩺 | Check `/dev/fuse` and `fusermount3`, and say what to install. |
+Grouped by what each one is *about* — nothing spans two groups.
 
----
+| | Command | Does |
+| --- | --- | --- |
+| ✍️ **Declare** | `add` `rm` | Declare a workspace or remove it, then reload. |
+| | `enable` `disable` | Start or stop serving one, keeping the declaration. |
+| 🔍 **Inspect** | `ls` | One line per declared workspace. The inventory. |
+| | `inspect <name>` | What one workspace merges, and what it shadows. |
+| 🧵 **Run** | `up` `down` | Start the daemon, or stop it and release everything. |
+| | `reload` | Re-read the configuration and reconcile. |
+| | `status` | Which config the daemon loaded, and what is mounted. |
+| | `doctor` | Check the host and say what to install. |
+
+`inspect` says what *should* be there; `status` says what *is*. When they
+disagree, that difference is the diagnosis. 🔎
 
 ## 🚧 Status
 
 !!! success "Implemented"
 
     Every spec in [`docs/specs/`](specs/index.md) is `implemented`: the library
-    and the `airfs` command exist, and the merge, the mount, and the CLI are
-    covered by tests. `airfs` replaces a `mergerfs`-based `Makefile` setup in
-    [ai-resources](https://github.com/hoshiyosan/ai-resources).
+    and the `airfs` command exist, and the merge, the mount, the daemon and the
+    CLI are covered by tests. `airfs` replaces a `mergerfs`-based `Makefile`
+    setup in [ai-resources](https://github.com/hoshiyosan/ai-resources).
 
     No implementation change lands without an agreed spec.
 
+!!! warning "Not yet: per-context curation"
+
+    A workspace exposes every entry its sources contain, under the folders it
+    declares. Choosing a *subset* — "this context sees only these three skills" —
+    is not implemented, and `folders` does not supply it: it names the box, not
+    what goes in it. Split the sources for now. 🧺
+
 ## 👉 Where next
 
-- 🚀 [Get started](get-started.md) — install and first mount, in five minutes
-- 📚 [User guide](user-guide/index.md) — layers, precedence, mounting, the Go API
-- 📐 [Specs](specs/index.md) — the model, the merge, the mount, the CLI
+- 🚀 [Get started](get-started.md) — install and first workspace, in five minutes
+- 📚 [User guide](user-guide/index.md) — workspaces, precedence, the daemon, the Go API
+- 📐 [Specs](specs/index.md) — the model, the config, the daemon, the mount, the CLI
 - 🤝 [Contribute](contribute/index.md) — setup, targets, and quality gates

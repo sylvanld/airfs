@@ -4,19 +4,23 @@ Start with the three commands that only report, in this order. They cost nothing
 and they answer most questions before you have to guess:
 
 ```bash
-airfs doctor    # can this host mount at all?
-airfs sources   # what does my layer list actually mean?
-airfs status    # is this workspace being served right now?
+airfs doctor           # can this host mount at all?
+airfs status           # what is the daemon doing, and what is mounted?
+airfs inspect <name>   # what does this workspace actually merge?
 ```
+
+The last two are the pair worth internalising: **`inspect` says what should be
+there, `status` says what is.** When they disagree, that difference is the
+diagnosis. 🔎
 
 ## `airfs doctor` says something is missing 🩺
 
 ```
-  ok       /dev/fuse      readable and writable by you
-  MISSING  fusermount3    not found on PATH
-                          provided by the system FUSE package, libfuse3-3 on Debian and Ubuntu
+  ok       /dev/fuse        readable and writable by you
+  MISSING  fusermount3      not found on PATH
+                            provided by the system FUSE package, libfuse3-3 on Debian and Ubuntu
 
-airfs: a mount prerequisite is missing; install what provides it, then run airfs doctor again
+airfs: a prerequisite is missing; install what provides it, then run airfs doctor again
 ```
 
 Install the named package (`fuse3` on Debian, Ubuntu, Fedora, and Arch) and run
@@ -31,32 +35,56 @@ is provided by the kernel, not by a package — a container needs
 an unprivileged process genuinely cannot mount without it. Reinstalling the FUSE
 package restores the bit.
 
-## My repository's resources are not showing up 🤷
+**`XDG_RUNTIME_DIR` not set** means the daemon has nowhere to put its control
+socket, and it refuses to start rather than falling back to a world-writable
+directory. It is normally set by your login session; if you are in a bare `su` or
+a minimal container, set it to a private directory you own.
 
-Run `airfs sources` and read the counts:
+## `airfs` is ignoring my edit 🚨
+
+**Check line two of `airfs status` first.**
 
 ```
-  1. ~/ai/personal    agents 0  skills 2  commands 0  scripts 0
-  2. ~/ai/project     agents 0  skills 0  commands 0  scripts 0
+daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
+config  /home/you/experiment.yaml
+
+! The daemon is serving /home/you/experiment.yaml, but this command reads
+  /home/you/.config/airfs/config.yaml.
+  Edits to the second will not take effect until the daemon is restarted against it.
+```
+
+A daemon started with `--config` holds that file for its **whole life**. The file
+you are editing and the file being served have drifted apart, and every symptom
+of that looks exactly like a bug. `airfs down && airfs up` fixes it.
+
+## My repository's resources are not showing up 🤷
+
+Run `airfs inspect <name>` and read the counts:
+
+```
+  1. ~/ai/personal    skills 2  commands 0
+  2. ~/ai/project     skills 0  commands 0
 ```
 
 `skills 0` next to a repository you know has skills means one of:
 
-- **The resources are not under a kind directory.** They must live at
-  `<layer>/skills/<entry>`, not at `<layer>/<entry>` or nested deeper.
-- **The kind is wrong.** The four are fixed: `agents`, `skills`, `commands`,
-  `scripts`. A `tools/` directory contributes nothing.
-- **The path points somewhere else than you think.** The report names layers as
+- **The resources are not under a declared folder.** They must live at
+  `<source>/skills/<entry>`, not at `<source>/<entry>` or nested deeper.
+- **The workspace does not declare that folder.** `folders` is per workspace —
+  a repository's `tools/` contributes nothing unless some workspace asks for
+  `tools`. Check the `folders` line at the top of the report.
+- **The path points somewhere else than you think.** The report names sources as
   you declared them; a `$VAR` may be resolving to an unexpected directory.
 
-If the layer does not appear at all, it is not in the file — check the `config`
-path printed at the top, since `--config` and the default may differ.
+If the source does not appear at all, it is not in that workspace's `sources` —
+check the `config` path `airfs ls` prints, since `--config` and the default may
+differ.
 
 ## My edit did nothing 🕵️
 
-Two causes, in order of likelihood.
+Three causes, in order of likelihood.
 
-**The entry is shadowed.** A later layer ships the same name and wins *whole*.
+**The entry is shadowed.** A later source ships the same name and wins *whole*.
 Check the shadowing report:
 
 ```
@@ -65,35 +93,50 @@ Shadowed entries — the winner is what the view serves:
 ```
 
 You edited `~/ai/personal/skills/commit/`; the view serves `~/ai/project`'s. Edit
-the winner, or reorder the layers. Note that this covers files the winner does
+the winner, or reorder the sources. Note that this covers files the winner does
 not even have — a `helper.sh` in the losing copy is invisible, because entries
 win whole rather than file by file.
+
+**The workspace is disabled.** `airfs status` says so plainly, and it is the
+configuration being honoured rather than a failure. `airfs enable <name>`.
 
 **The mount is stale.** The serving process died, and the kernel still lists the
 mountpoint while every access to it fails:
 
 ```
-  skills    stale — the serving process died; recover with airfs umount
+  /home/you/.ai-resources/skills  STALE — its serving process died; recover with airfs down
 ```
 
 ```bash
-airfs umount && airfs mount --detach
+airfs down && airfs up --detach
 ```
 
 What is *not* a cause: caching. The view caches nothing, so an edit to a file in
-a layer that is genuinely winning is visible on the very next read.
+a source that is genuinely winning is visible on the very next read.
 
-## I added a layer and nothing changed 🔄
+## I changed the config and nothing happened 🔄
 
-The layer list is resolved when serving starts. Editing `sources.txt` does not
-affect a running mount — remount:
+The daemon **does not watch the file** — an editor writing a file is not one
+event, and reacting to the first of them would act on half a document.
 
-```bash
-airfs umount && airfs mount --detach
+- Edited by hand? Run `airfs reload`.
+- Used `add`, `rm`, `enable` or `disable`? They reload on their own.
+
+Editing *within* an existing source needs no reload at all; only changing the set
+of workspaces, sources or folders does.
+
+## One workspace failed and the others are fine ✅
+
+That is deliberate. When one file describes the whole machine, one mistyped path
+must not take down the rest, so a workspace that cannot be established fails
+**alone** and everything else is served:
+
+```
+  work      NOT SERVED ~/work/.ai-resources — source ~/work/client-acme: no such file or directory
 ```
 
-Editing *within* an existing layer needs no remount; only changing the set of
-layers does.
+Fix the reason and run `airfs reload`. There is no retry timer and no backoff:
+reconciliation *is* the retry.
 
 ## `<dir> is not empty` 🚧
 
@@ -105,32 +148,38 @@ ls -la ~/.ai-resources/skills
 ```
 
 If it is a leftover copy of resources you are now layering, delete it. If it is
-something you still want, move it into one of your layers so it is served
+something you still want, move it into one of your sources so it is served
 properly.
 
-## `<dir> is already served` 🔁
+## `Mounted, belonging to no declared workspace` 🧹
 
-The target is mounted. `airfs status` will confirm it. Use `airfs umount` first,
-or pick a different `--target` — a second mount over the same directory would
-stack a view on a view.
+`airfs status` found `airfs` mounts the current configuration does not account
+for — left by a previous configuration, a previous daemon, or a crash. This is
+the whole reason reconciliation reads the kernel rather than a file of its own.
+
+```bash
+airfs down     # releases every airfs mount on the machine, alive or stale
+```
 
 ## `Read-only file system` 🛡️
 
 Working as intended: the kernel enforces it. A new file in the merged view would
-belong to *some* layer, and the view has no basis to pick one. Create or edit the
-file in the repository that owns it, where it gets that repository's git history,
-review, and tests.
+belong to *some* source, and the view has no basis to pick one. Create or edit
+the file in the repository that owns it, where it gets that repository's git
+history, review, and tests.
 
 ## Nothing is mounted after a reboot 🔌
 
-`airfs` has no supervision of its own. Mounts do not survive a reboot unless
-something restarts them — see the systemd user unit in
-[mounting.md](mounting.md#running-it-at-login).
+`airfs` has no supervision of its own. Nothing survives a reboot unless something
+restarts the daemon — see the systemd user unit in
+[running-the-daemon.md](running-the-daemon.md#across-reboots-systemd-optionally).
 
 ## The report names a path I did not expect 🧭
 
-Every relative path in `sources.txt` resolves against **that file's directory**,
-never against your working directory. If you keep an experimental list somewhere
-else, its relative layers are relative to *there*. The absolute paths are in the
-error messages; `airfs sources` prints the `target` and `config` it used before
-anything else.
+Every relative path *inside* the configuration resolves against **that file's
+directory**, never against your working directory. A path typed on the command
+line is the opposite: it resolves against where you are standing.
+
+`airfs ls` prints the `config` path it used before anything else, and every report
+names sources and targets **as you declared them** rather than by a resolved
+symlink target.

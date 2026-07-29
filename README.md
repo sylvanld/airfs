@@ -52,7 +52,9 @@ in its repository and the change is visible through every workspace that layers
 it, immediately - no sync step, no copy to refresh. 🔄
 
 Every workspace gets its own view, so the same capability can be shared by many
-workspaces without any of them seeing the others' layers.
+workspaces without any of them seeing the others' layers. Every workspace on the
+machine is declared in **one file** and held by **one daemon**, so "what is
+`airfs` doing here?" has one answer you can read and diff. 🏛️
 
 ## How workspaces are composed 🥇
 
@@ -75,7 +77,7 @@ flowchart TB
 ```
 
 > [!TIP]
-> Shadowing is always reported, never silent. `airfs sources` lists every
+> Shadowing is always reported, never silent. `airfs inspect` lists every
 > shadowed entry with its winner and its losers - a silent shadow is what makes a
 > workspace untrustworthy. 🕵️
 
@@ -88,25 +90,60 @@ flowchart TB
 
 ## How a workspace is exposed 🚪
 
-A workspace is a folder holding its own declaration and one FUSE mount per kind
-of capability:
+A target holds one FUSE mount per **folder** the workspace declares, and nothing
+else:
 
 ```
 ~/.ai-resources/
-  sources.txt     # the ordered layers - never masked by a mount
   agents/         # mountpoint
   skills/         # mountpoint
   commands/       # mountpoint
-  scripts/        # mountpoint
 ```
 
-`airfs mount` establishes them together and blocks while serving, or runs as a
-daemon with `--detach`; `airfs umount` releases them, stale mountpoints included.
-Read-only is enforced by the kernel 🛡️, so nothing can write into a source
-repository through the view even by mistake.
+The folder names are yours: `airfs` attaches no meaning to any of them, merges
+the directory called what you called it, and never creates one inside a source
+repository. Declare `prompts` and it merges `prompts/`.
+
+`airfs up` starts the daemon and serves every enabled workspace, blocking or with
+`--detach`; `airfs down` stops it and releases every `airfs` mount on the machine,
+stale ones included. Read-only is enforced by the kernel 🛡️, so nothing can write
+into a source repository through the view even by mistake.
 
 Mounting needs `/dev/fuse` and a setuid `fusermount3`. Not sure you have them?
 Run **`airfs doctor`** - it checks the host and names the package to install. 🩺
+
+## Declaring it ⚙️
+
+One YAML file at `~/.config/airfs/config.yaml`:
+
+```yaml
+workspaces:
+  personal:
+    target: ~/.ai-resources
+    folders: [agents, skills, commands]
+    sources:
+      - ~/repos/personal-capabilities   # 1st - most general
+      - ~/repos/org-capabilities        # 2nd - wins every collision
+```
+
+Write it by hand, or let `airfs add` write it for you - comments, key order, YAML
+anchors and aliases survive an edit either way.
+
+## One daemon, reconciling 🔁
+
+Everything the daemon does is one operation: make what is mounted match what is
+declared. Its inputs are your configuration and **every `airfs` mount the kernel
+reports** - not just the ones under a target you currently declare.
+
+That is what lets one command account for the whole host, including mounts left
+behind by a crashed daemon or a configuration you have since changed. It reads
+the kernel rather than a file `airfs` keeps, because a file `airfs` keeps
+disagrees with reality exactly when it matters.
+
+> [!TIP]
+> The kernel is the inventory; the configuration is the intent. A workspace that
+> cannot be established fails **alone** - one mistyped path never takes down the
+> rest. 🛡️
 
 ## Why pure Go 🐹
 

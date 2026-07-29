@@ -2,6 +2,22 @@
 
 All notable changes to `airfs` are documented here. Versions follow [semantic versioning](https://semver.org/).
 
+## v0.3.0 — one file, one daemon 🏛️
+
+> **You can finally answer "what is airfs doing on this machine?" in one place.** Until now every workspace hid its own `sources.txt` inside the directory it produced, findable only if you already knew where to look, and every workspace ran its own process. Now one file declares all of them and one daemon holds all of them — and it reconciles against what the *kernel* says is mounted, so it accounts for everything on the host, including what a crashed daemon left behind.
+
+- 🏛️ **One configuration, at `~/.config/airfs/config.yaml`.** Every workspace on the machine in one YAML file you can read, diff and put in git. Each one names its target, its ordered sources, and the folders it merges. Start with [Declaring workspaces](https://sylvanld.github.io/airfs/user-guide/declaring-workspaces/).
+- 🏷️ **Folders are yours to name.** `agents`, `skills`, `commands` and `scripts` were hardcoded; now each workspace declares the subdirectories it wants merged, and `airfs` attaches no meaning to any of them. A tool that expects `prompts/` is one `-f prompts` away. The old four are still the default when you declare none.
+- ✋ **Nothing is ever written into a source repository.** Resolution used to create missing subdirectories inside every repository you pointed it at. It does not any more — a source that lacks a folder simply contributes nothing to it.
+- 🧵 **One daemon instead of one process per workspace.** `airfs up` serves everything enabled, `airfs down` stops it and releases every `airfs` mount there is, `airfs reload` catches up with a file you edited by hand. A systemd user unit is in [Running the daemon](https://sylvanld.github.io/airfs/user-guide/running-the-daemon/) if you want it at login.
+- 🛡️ **A broken workspace no longer takes down the rest.** One mistyped path used to stop everything; now it fails that workspace alone, is reported with its reason, and every other workspace is served. When one file describes the machine, the blast radius of an edit has to be the block you edited.
+- 🔌 **`airfs disable` — stop serving something without deleting it.** Deleting a workspace to pause it destroys the block you wrote, comments and ordering included, and re-adding brings none of it back. A disabled workspace is information; a deleted one is a gap.
+- 🔍 **`airfs ls` and `airfs inspect` replace `airfs sources`.** `ls` is the inventory in one screen; `inspect <name>` is the deep read — sources in precedence order, entry counts per folder, and every shadowed entry with its winner and its losers.
+- 🚨 **`airfs status` tells you which config the daemon actually loaded.** A daemon started with `--config` holds that file for its whole life, so the file you are editing and the file being served can drift apart — and every symptom of that looks like `airfs` ignoring your edit. Now it says so, on its own line.
+- ✍️ **Editing commands keep what you wrote.** `add`, `rm`, `enable` and `disable` preserve comments, key order, YAML anchors and aliases. And because a merge key carries an edit to its aliases, they report every workspace whose meaning changed — not just the one you named.
+
+> **This replaces v0.2.0's layout entirely. 💥** Your `sources.txt` files are not read any more and there is no automatic migration: run `airfs down` with the old binary, then `airfs add <name> --target <dir> -s <each source> -f <each folder>` once per workspace. Five minutes end to end is [Get started](https://sylvanld.github.io/airfs/get-started/).
+
 ## v0.2.0 — a workspace in one command 🚀
 
 > **You no longer need a file before you can mount anything.** Until now, trying `airfs` at all meant opening an editor, writing a `sources.txt`, saving it in the right place, and only then mounting. That is a lot of ceremony to answer "what does this thing actually do?" — so now you can say what your layers are on the command line and be looking at the result a second later.

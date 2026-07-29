@@ -11,10 +11,10 @@ it.
 
 | Spec | Description | Status |
 | --- | --- | --- |
-| [layered-resources.md](layered-resources.md) | The core model: sources, folders, workspaces, precedence, shadowing | accepted |
-| [workspace-config.md](workspace-config.md) | The centralized config: one YAML file declaring every workspace | accepted |
-| [daemon.md](daemon.md) | One daemon per user: reconciling declared workspaces against the mount table | accepted |
+| [layered-resources.md](layered-resources.md) | The core model: sources, folders, workspaces, precedence, shadowing | implemented |
+| [workspace-config.md](workspace-config.md) | The centralized config: one YAML file declaring every workspace | implemented |
+| [daemon.md](daemon.md) | One daemon per user: reconciling declared workspaces against the mount table | implemented |
 | [layered-fs.md](layered-fs.md) | Ordered read-only `fs.FS` union: lookup, listing, dedup, edge cases | implemented |
-| [fuse-mount.md](fuse-mount.md) | Serving a folder's union as one read-only FUSE mount, in pure Go | accepted |
-| [cli.md](cli.md) | The `airfs` command surface and its exit codes | accepted |
+| [fuse-mount.md](fuse-mount.md) | Serving a folder's union as one read-only FUSE mount, in pure Go | implemented |
+| [cli.md](cli.md) | The `airfs` command surface and its exit codes | implemented |
 | [source-config.md](source-config.md) | Per-target `sources.txt` — superseded by [workspace-config.md](workspace-config.md) | superseded |

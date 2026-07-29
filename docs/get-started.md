@@ -1,7 +1,7 @@
 # Get started 🚀
 
-Install `airfs`, declare two layers, and read them as one directory. About five
-minutes, ending with a working workspace you can keep.
+Install `airfs`, declare a workspace over two repositories, and read them as one
+directory. About five minutes, ending with a workspace you can keep.
 
 ## 1. Install 📦
 
@@ -56,10 +56,11 @@ airfs doctor
 ```
 
 ```
-  ok       /dev/fuse      readable and writable by you
-  ok       fusermount3    /usr/bin/fusermount3, setuid
+  ok       /dev/fuse        readable and writable by you
+  ok       fusermount3      /usr/bin/fusermount3, setuid
+  ok       control socket   /run/user/1000/airfs/control.sock
 
-Every mount prerequisite is satisfied.
+Every prerequisite is satisfied.
 ```
 
 If something is missing, `doctor` names the package that provides it and exits
@@ -71,16 +72,9 @@ and Arch — then run `airfs doctor` again.
     Installing a system package needs root, and a tool that asks you for root to
     run a package manager is a tool that should have printed the command instead.
 
-## 3. Create a workspace 🗂️
+## 3. Make two source repositories 🗂️
 
-A workspace is an ordinary directory holding one plain-text file. The default is
-`~/.ai-resources`, which is where agent tooling usually looks:
-
-```bash
-mkdir -p ~/.ai-resources
-```
-
-For this walkthrough, two layers — a personal one and a project one:
+For this walkthrough, two sources — a personal one and a project one:
 
 ```bash
 mkdir -p ~/ai/personal/skills/commit ~/ai/personal/skills/review
@@ -92,69 +86,89 @@ echo "project commit skill"  > ~/ai/project/skills/commit/SKILL.md
 ```
 
 In real use these are git working copies you already have — nothing about a
-layer is `airfs`-specific, and `airfs` never writes into one.
+source is `airfs`-specific, and **`airfs` never writes into one**. ✋
 
-## 4. Declare the layers ✍️
+## 4. Declare a workspace ✍️
 
-One path per line, in `~/.ai-resources/sources.txt`. **The order is the
-precedence order: the last line wins.** Declare from the most general to the most
-specific.
-
-```bash
-cat > ~/.ai-resources/sources.txt <<'EOF'
-# Layers, most general first — the last declaration wins.
-~/ai/personal
-~/ai/project
-EOF
-```
-
-Now ask `airfs` what that file means, before mounting anything:
+One command brings it into being, no editor required. The order of the `-s`
+flags **is** the precedence order: most general first, last wins.
 
 ```bash
-airfs sources
+airfs add personal \
+  --target ~/.ai-resources \
+  -s ~/ai/personal \
+  -s ~/ai/project \
+  -f skills
 ```
 
 ```
-target  /home/you/.ai-resources
-config  /home/you/.ai-resources/sources.txt
+Declared personal in /home/you/.config/airfs/config.yaml:
+  target   ~/.ai-resources
+  folders  skills
+  sources, in precedence order — the last declaration wins:
+    1. ~/ai/personal
+    2. ~/ai/project
+Changed: personal
+
+No daemon is running, so nothing was mounted or released.
+The configuration is written. Serve it with: airfs up
+```
+
+Two things to notice. The paths were written down **as you typed them** — `~/ai/personal`
+stays that, rather than being frozen into `/home/you/...` — so the file stays
+something you would have written by hand. And the command wrote the file even
+though nothing is serving it yet: the declaration is the durable half. It exits
+`2` to say the machine has not caught up. 📝
+
+`-f skills` says which subdirectories to merge. Give none and you get the default
+set, `agents skills commands scripts`. **`airfs` attaches no meaning to any of
+these names** — declare `-f prompts` and it merges `prompts/`.
+
+Now ask what that declaration actually means, before serving it:
+
+```bash
+airfs inspect personal
+```
+
+```
+workspace  personal
+target     ~/.ai-resources
+folders    skills
 
 Sources, in precedence order — the last declaration wins:
-  1. ~/ai/personal  agents 0  skills 2  commands 0  scripts 0
-  2. ~/ai/project   agents 0  skills 1  commands 0  scripts 0
-
-Empty kinds: agents, commands, scripts
+  1. ~/ai/personal  skills 2
+  2. ~/ai/project   skills 1
 
 Shadowed entries — the winner is what the view serves:
   skills/commit  wins ~/ai/project  over ~/ai/personal
 ```
 
-Both layers ship a `commit` skill, so one has to lose. The report says which, by
-name — the point being that shadowing is never silent. `sources` reads and
-reports only; it mounts nothing.
+Both sources ship a `commit` skill, so one has to lose. The report says which, by
+name — the point being that **shadowing is never silent**. 🕵️ `inspect` reads and
+reports only; it mounts nothing and needs no daemon.
 
-!!! note "Where did the empty kinds come from?"
-
-    `airfs` creates the missing `agents/`, `commands/`, and `scripts/`
-    directories inside each layer, so that every layer contributes every kind and
-    adding a resource of a new kind never needs a `mkdir` first.
-
-## 5. Mount it 🧵
+## 5. Serve it 🧵
 
 ```bash
-airfs mount --detach
+airfs up --detach
 ```
 
 ```
-Serving /home/you/.ai-resources from 2 sources:
-  1. ~/ai/personal
-  2. ~/ai/project
+daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
+config  /home/you/.config/airfs/config.yaml
 
-Serving in the background. Stop it with: airfs umount --target /home/you/.ai-resources
+  personal  served     ~/.ai-resources
+
+Mounted for personal:
+  /home/you/.ai-resources/skills  2 entries
+
+Serving in the background. Stop it with: airfs down
 ```
 
-Without `--detach`, `airfs mount` blocks in the foreground and unmounts on
-++ctrl+c++ — which is what you want from a service manager unit, or while you are
-still experimenting.
+One daemon holds every workspace you declare — not one process each. Without
+`--detach` it blocks in the foreground and releases everything on ++ctrl+c++,
+which is what you want from a service manager unit, or while you are still
+experimenting.
 
 ## 6. Read the merged view 👀
 
@@ -166,7 +180,7 @@ ls ~/.ai-resources/skills
 commit  review
 ```
 
-One directory, both layers. And the winner won *whole*:
+One directory, both sources. And the winner won *whole*:
 
 ```bash
 cat ~/.ai-resources/skills/commit/SKILL.md
@@ -188,8 +202,8 @@ cat ~/.ai-resources/skills/commit/SKILL.md
 edited in place
 ```
 
-No sync step, no remount. The view holds no copy and caches nothing; it reads
-through to the file you just edited. Adding a whole new skill to a layer works
+No sync step, no reload. 🔄 The view holds no copy and caches nothing; it reads
+through to the file you just edited. Adding a whole new skill to a source works
 the same way — it appears in the listing immediately.
 
 The other direction is refused, by the kernel rather than by convention:
@@ -202,41 +216,58 @@ touch ~/.ai-resources/skills/new.md
 touch: cannot touch '/home/you/.ai-resources/skills/new.md': Read-only file system
 ```
 
-A new file in the merged view would belong to *some* layer, and the view has no
-basis to pick one. Create it in the repository that owns it.
+A new file in the merged view would belong to *some* source, and the view has no
+basis to pick one. Create it in the repository that owns it. 🛡️
 
-## 7. Check and stop 📊
+## 7. Check, pause, stop 📊
 
 ```bash
 airfs status
 ```
 
 ```
-target  /home/you/.ai-resources
+daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
+config  /home/you/.config/airfs/config.yaml
 
-  agents    served, 0 entries
-  skills    served, 2 entries
-  commands  served, 0 entries
-  scripts   served, 0 entries
+  personal  served     ~/.ai-resources
+
+Mounted for personal:
+  /home/you/.ai-resources/skills  2 entries
 ```
 
-`status` exits `0` when the target is fully served and `2` when it is not, so a
-shell profile can branch on it without reading the prose.
+`status` exits `0` when every enabled workspace is fully served and `2` when any
+is not, so a shell profile can branch on it without reading the prose.
+
+To stop serving one workspace without losing what produced it:
 
 ```bash
-airfs umount
+airfs disable personal    # released from the machine, untouched in the file
+airfs enable personal     # back
+```
+
+And to stop everything:
+
+```bash
+airfs down
 ```
 
 ```
-Released /home/you/.ai-resources/agents
-Released /home/you/.ai-resources/skills
-Released /home/you/.ai-resources/commands
-Released /home/you/.ai-resources/scripts
+Stopped the daemon.
+
+  released       personal — the daemon is stopping
 ```
+
+`down` releases **every** `airfs` mount on the machine — including anything a
+previous daemon left behind, or a mount whose serving process died. That is what
+makes it the one recovery command you need. 🧹
+
+Your declaration is still in `~/.config/airfs/config.yaml`. `airfs up` restores
+exactly what was running.
 
 ## Where next 👉
 
-- 📚 [User guide](user-guide/index.md) — layers, precedence, mounting, the Go API
-- 🧭 [Declaring layers](user-guide/declaring-layers.md) — the full file format
+- 📚 [User guide](user-guide/index.md) — sources, precedence, the daemon, the Go API
+- 🧭 [Declaring workspaces](user-guide/declaring-workspaces.md) — the full file format
+- 🧵 [Running the daemon](user-guide/running-the-daemon.md) — reload, systemd, reconciliation
 - 🩹 [Troubleshooting](user-guide/troubleshooting.md) — when something is not served
 - 📐 [Specs](specs/index.md) — why it behaves the way it does

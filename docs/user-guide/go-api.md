@@ -19,18 +19,20 @@ in the standard library that consumes a filesystem already works — `fs.WalkDir
 `fs.ReadFile`, `template.ParseFS`, `http.FS`.
 
 ```go
-cfg, err := sources.Load(configPath)
+cfg, err := config.Load(configPath)
 if err != nil {
     return err
 }
 
-skills := cfg.Merged(airfs.Skills)   // *layerfs.FS
+w := cfg.Lookup("personal")          // *config.Workspace
+skills := w.Merged("skills")         // *layerfs.FS
 
 data, err := fs.ReadFile(skills, "commit/SKILL.md")
 ```
 
-`Merged` gives the union for one kind; `airfs.Kinds` iterates all four
-(`airfs.Agents`, `airfs.Skills`, `airfs.Commands`, `airfs.Scripts`).
+`Merged` gives the union for one folder, and `w.Folders` is what that workspace
+declared. `config.DefaultFolders` is the set used when a workspace declares
+none.
 
 An `FS` is immutable once constructed and safe for concurrent use, and it holds
 no cache of any kind — an edit inside a layer is visible through it immediately.
@@ -74,7 +76,7 @@ for _, s := range shadows {
 ```
 
 This is what makes precedence auditable from your own tooling, in the same terms
-`airfs sources` prints.
+`airfs inspect` prints.
 
 ## Mounting from Go 🧵
 
@@ -83,7 +85,7 @@ if err := mount.Preflight(); err != nil {
     return err   // /dev/fuse or a setuid fusermount3 is missing
 }
 
-server, err := mount.Serve(target, cfg)
+server, err := mount.Serve(w)   // one *config.Workspace
 if err != nil {
     return err
 }
@@ -92,17 +94,44 @@ defer server.Unmount()
 server.Wait()   // blocks until unmounted
 ```
 
-`Serve` establishes every kind together and releases them all if any fails — a
-partially mounted target is a view that lies about what is available.
+`Serve` establishes every folder together and releases them all if any fails — a
+partially mounted workspace is a view that lies about what is available.
 
-For inspection without serving, `mount.Status(target)` returns one `State` per
-kind, read from the kernel's mount table. A `State` that is `Mounted` **and**
-`Stale` is the signature of a serving process that died: still listed, failing
-every access. `mount.Served(states)` collapses the four into the one boolean most
-callers want.
+For inspection without serving, `mount.Mounts()` returns **every `airfs` mount on
+the machine**, read from the kernel's mount table — not just the ones you know
+about. A `Mount` that is `Stale` is the signature of a serving process that died:
+still listed by the kernel, failing every access. `mount.Under(mounts, dir)`
+narrows the list to one target.
 
 `mount.Requirements()` gives the same host check `airfs doctor` prints, as data —
 each with `Name`, `Satisfied`, `Detail`, and `ProvidedBy`.
+
+## Driving the daemon 🧭
+
+```go
+d, outcomes, err := daemon.Start(configPath)   // reconciles, then listens
+if err != nil {
+    return err
+}
+defer d.Stop()
+
+for _, o := range outcomes {
+    log.Println(o)   // established / re-established / unchanged / released / failed
+}
+return d.Wait()
+```
+
+From another process, `daemon.Dial` reaches a running one: `Status`, `Reload`,
+`Shutdown`. `daemon.Running()` is the liveness check, and it verifies itself — a
+socket left behind by a dead daemon refuses connections, so "can I connect" and
+"is it alive" are the same question.
+
+!!! note "The control socket is private"
+
+    It is an implementation detail between a daemon and the CLI built from the
+    same source: not documented for third parties, not versioned. The **SDK** is
+    the supported programmatic interface, and a program that wants the merged
+    view just reads the mounted directory. 🔒
 
 ## Errors you should branch on ⚠️
 
@@ -123,14 +152,16 @@ same distinction the CLI turns into exit code `2`.
 
 Everything importable lives under `sdk/`; `cmd/airfs` is the frontend and is not
 part of the API. The `sdk` directory holds package `airfs`, so an import of
-`.../airfs/sdk` is used as `airfs.Kind`, `airfs.IsPrecondition`, and so on.
+`.../airfs/sdk` is used as `airfs.IsPrecondition`, `airfs.ExitPrecondition`, and
+so on.
 
 | Package | Holds |
 | --- | --- |
-| `github.com/sylvanld/airfs/sdk` | Package `airfs`: the model (`Kind`, `Kinds`), the precondition contract, exit codes. |
+| `github.com/sylvanld/airfs/sdk` | Package `airfs`: the precondition contract and the exit codes. |
 | `.../sdk/layerfs` | The ordered read-only union, as a standard `fs.FS`. |
-| `.../sdk/sources` | Reading and resolving `sources.txt` into layers. |
-| `.../sdk/mount` | Exposing a view at a real path via FUSE, and reading mount state. |
+| `.../sdk/config` | Reading, resolving and **editing** the workspace configuration. |
+| `.../sdk/mount` | Exposing a workspace at a real path via FUSE, and reading the kernel's mount table. |
+| `.../sdk/daemon` | Reconciling declared workspaces against what is mounted, and the control socket. |
 
 Every dependency is cgo-free, so a program embedding `airfs` still builds with
 `CGO_ENABLED=0`.

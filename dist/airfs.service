@@ -1,0 +1,29 @@
+; A systemd user unit for the airfs daemon. Installing it is optional: airfs
+; does not require systemd, does not detect it, and behaves identically under it.
+;
+;   install -Dm644 dist/airfs.service ~/.config/systemd/user/airfs.service
+;   systemctl --user daemon-reload
+;   systemctl --user enable --now airfs
+;
+; See docs/user-guide/running-the-daemon.md.
+
+[Unit]
+Description=airfs — merged read-only view of AI resource repositories
+Documentation=https://sylvanld.github.io/airfs/
+
+[Service]
+Type=simple
+; up runs in the foreground and releases every mount it holds on termination,
+; which is exactly what a simple service should do. Detaching here would leave
+; systemd supervising a process that exits immediately.
+ExecStart=%h/.local/bin/airfs up
+; Reconciliation is idempotent, so reloading is safe to ask for at any time.
+ExecReload=%h/.local/bin/airfs reload
+; SIGTERM permits cleanup, so the daemon unmounts before exiting. A workspace
+; that failed to establish exits 2, which is a reason to retry rather than to
+; give up: the source may be a repository that is not cloned yet.
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
