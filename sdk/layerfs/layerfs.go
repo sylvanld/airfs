@@ -3,6 +3,7 @@
 package layerfs
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"sort"
@@ -49,12 +50,21 @@ var (
 //
 // Lookup and listing are both derived from this one map, which is what makes a
 // listed name and a looked-up name resolve to the same layer by construction.
-// It is rebuilt per operation: the union caches nothing, and a kind directory
-// holds few entries.
+// It is rebuilt per operation: the union caches nothing, and a folder holds
+// few entries.
+//
+// A layer whose root does not exist contributes nothing rather than failing.
+// That is the ordinary case, not a broken one: a source declares the folders it
+// has, and airfs creates none of them. It is also what lets a folder added to a
+// source appear through the view without re-establishing it. Every other
+// failure to read a layer still propagates.
 func (f *FS) index() (map[string]winner, error) {
 	owner := make(map[string]winner)
 	for i, l := range f.layers {
 		entries, err := fs.ReadDir(l.FS, ".")
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return nil, &fs.PathError{Op: "readdir", Path: l.Name, Err: err}
 		}
@@ -199,6 +209,11 @@ func (f *FS) Shadowed() ([]Shadow, error) {
 	holders := make(map[string][]int)
 	for i, l := range f.layers {
 		entries, err := fs.ReadDir(l.FS, ".")
+		if errors.Is(err, fs.ErrNotExist) {
+			// A layer that is not there contributes nothing, and so shadows
+			// nothing. Same rule as index, for the same reason.
+			continue
+		}
 		if err != nil {
 			return nil, &fs.PathError{Op: "readdir", Path: l.Name, Err: err}
 		}

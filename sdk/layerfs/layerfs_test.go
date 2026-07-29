@@ -3,6 +3,8 @@ package layerfs_test
 import (
 	"errors"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 	"testing/fstest"
 
@@ -257,4 +259,28 @@ func mustReadDir(t *testing.T, f *layerfs.FS, name string) []fs.DirEntry {
 		t.Fatalf("reading %s: %v", name, err)
 	}
 	return entries
+}
+
+// A layer whose root is not there is the ordinary case, not a broken one: a
+// workspace declares the folders it wants merged, a source contains the ones it
+// has, and airfs creates neither.
+func TestAbsentLayerContributesNothing(t *testing.T) {
+	absent := layerfs.Layer{Name: "absent", FS: os.DirFS(filepath.Join(t.TempDir(), "nothing-here"))}
+	f := layerfs.New(
+		layer("global", fstest.MapFS{"commit/SKILL.md": file("global")}),
+		absent,
+	)
+
+	equal(t, names(t, mustReadDir(t, f, ".")), []string{"commit"})
+	if got := read(t, f, "commit/SKILL.md"); got != "global" {
+		t.Errorf("got %q", got)
+	}
+	// It shadows nothing either, so inspecting a workspace over it still works.
+	shadows, err := f.Shadowed()
+	if err != nil {
+		t.Fatalf("Shadowed over an absent layer: %v", err)
+	}
+	if len(shadows) != 0 {
+		t.Errorf("shadows = %v", shadows)
+	}
 }

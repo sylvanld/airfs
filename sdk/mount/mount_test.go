@@ -9,33 +9,51 @@ import (
 	"time"
 
 	"github.com/sylvanld/airfs/sdk"
+	"github.com/sylvanld/airfs/sdk/config"
 	"github.com/sylvanld/airfs/sdk/mount"
-	"github.com/sylvanld/airfs/sdk/sources"
 )
 
-// serve mounts a target built from the given source list and returns the
-// target directory. The mount is released when the test ends.
+// A workspace under test: sources are directories beside the target, since a
+// target holds nothing but its mounted subfolders.
+type fixture struct {
+	dir       string
+	workspace *config.Workspace
+}
+
+// declare builds a workspace over the named sources, in precedence order. The
+// sources are not created; repo does that.
+func declare(t *testing.T, folders []string, names ...string) fixture {
+	t.Helper()
+	dir := t.TempDir()
+	w := &config.Workspace{
+		Name:    "test",
+		Target:  path(filepath.Join(dir, "target")),
+		Folders: folders,
+		Enabled: true,
+	}
+	for _, name := range names {
+		source := filepath.Join(dir, name)
+		if err := os.MkdirAll(source, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		w.Sources = append(w.Sources, path(source))
+	}
+	return fixture{dir: dir, workspace: w}
+}
+
+func path(p string) config.Path { return config.Path{Declared: p, Resolved: p} }
+
+// serve establishes the workspace and releases it when the test ends.
 //
 // The test skips rather than fails when the host cannot mount: /dev/fuse and a
 // setuid fusermount3 are the host's to provide, and a container that lacks them
 // is not a broken build.
-func serve(t *testing.T, body string, build func(target string)) string {
+func (f fixture) serve(t *testing.T) string {
 	t.Helper()
 	if err := mount.Preflight(); err != nil {
 		t.Skipf("host cannot mount: %v", err)
 	}
-
-	target := t.TempDir()
-	build(target)
-	config := filepath.Join(target, sources.FileName)
-	if err := os.WriteFile(config, []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := sources.Load(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	server, err := mount.Serve(target, cfg)
+	server, err := mount.Serve(f.workspace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,35 +62,33 @@ func serve(t *testing.T, body string, build func(target string)) string {
 			t.Errorf("unmounting: %v", err)
 		}
 	})
-	return target
+	return f.workspace.Target.Resolved
 }
 
-// repo creates a source with the given files relative to its root.
-func repo(t *testing.T, target, name string, files map[string]string) {
+// repo writes the given files into one of the workspace's sources.
+func (f fixture) repo(t *testing.T, name string, files map[string]string) {
 	t.Helper()
 	for rel, content := range files {
-		path := filepath.Join(target, name, rel)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		p := filepath.Join(f.dir, name, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 }
 
 func TestMountServesTheMergedView(t *testing.T) {
-	target := serve(t, "global\nproject\n", func(target string) {
-		repo(t, target, "global", map[string]string{
-			"skills/commit/SKILL.md":  "global",
-			"skills/commit/helper.sh": "only in global",
-			"skills/review/SKILL.md":  "review",
-			"commands/deploy.md":      "deploy",
-		})
-		repo(t, target, "project", map[string]string{
-			"skills/commit/SKILL.md": "project",
-		})
+	f := declare(t, []string{"skills", "commands"}, "global", "project")
+	f.repo(t, "global", map[string]string{
+		"skills/commit/SKILL.md":  "global",
+		"skills/commit/helper.sh": "only in global",
+		"skills/review/SKILL.md":  "review",
+		"commands/deploy.md":      "deploy",
 	})
+	f.repo(t, "project", map[string]string{"skills/commit/SKILL.md": "project"})
+	target := f.serve(t)
 
 	skills := filepath.Join(target, "skills")
 
@@ -89,7 +105,7 @@ func TestMountServesTheMergedView(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 
-	// A file entry is an entry, and each kind is its own mount.
+	// A file entry is an entry, and each folder is its own mount.
 	if got := readFile(t, filepath.Join(target, "commands", "deploy.md")); got != "deploy" {
 		t.Errorf("got %q", got)
 	}
@@ -103,24 +119,36 @@ func TestMountServesTheMergedView(t *testing.T) {
 	}
 }
 
-// The configuration file stays readable while the view is live, because the
-// mountpoints are the kind directories one level below it.
-func TestConfigurationFileIsNotMaskedByTheMounts(t *testing.T) {
-	target := serve(t, "global\n", func(target string) {
-		repo(t, target, "global", map[string]string{"skills/commit/SKILL.md": "x"})
-	})
-	if got := readFile(t, filepath.Join(target, sources.FileName)); got != "global\n" {
+// A workspace names the folders it merges; airfs attaches no meaning to any of
+// them and creates none of them in a source.
+func TestFoldersAreWhateverTheWorkspaceDeclared(t *testing.T) {
+	f := declare(t, []string{"prompts", "absent"}, "global")
+	f.repo(t, "global", map[string]string{"prompts/review.md": "review"})
+	target := f.serve(t)
+
+	if got := readFile(t, filepath.Join(target, "prompts", "review.md")); got != "review" {
 		t.Errorf("got %q", got)
+	}
+	// A folder no source contributes to is mounted and empty, not an error.
+	entries, err := os.ReadDir(filepath.Join(target, "absent"))
+	if err != nil {
+		t.Fatalf("a folder no source has must still be served: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("the empty folder lists %v", entries)
+	}
+	// airfs performs no write against a source.
+	if _, err := os.Stat(filepath.Join(f.dir, "global", "absent")); !os.IsNotExist(err) {
+		t.Error("serving created a folder inside a source")
 	}
 }
 
 // Read-only is enforced by the kernel, not by convention: no process can write
 // through the mount even by mistake.
 func TestWritesAreRejected(t *testing.T) {
-	target := serve(t, "global\n", func(target string) {
-		repo(t, target, "global", map[string]string{"skills/commit/SKILL.md": "x"})
-	})
-	skills := filepath.Join(target, "skills")
+	f := declare(t, []string{"skills"}, "global")
+	f.repo(t, "global", map[string]string{"skills/commit/SKILL.md": "x"})
+	skills := filepath.Join(f.serve(t), "skills")
 
 	if err := os.WriteFile(filepath.Join(skills, "new.md"), []byte("x"), 0o644); err == nil {
 		t.Error("creating a file through the mount succeeded")
@@ -128,18 +156,17 @@ func TestWritesAreRejected(t *testing.T) {
 	if err := os.Remove(filepath.Join(skills, "commit", "SKILL.md")); err == nil {
 		t.Error("deleting through the mount succeeded")
 	}
-	f, err := os.OpenFile(filepath.Join(skills, "commit", "SKILL.md"), os.O_WRONLY, 0)
+	file, err := os.OpenFile(filepath.Join(skills, "commit", "SKILL.md"), os.O_WRONLY, 0)
 	if err == nil {
-		f.Close()
+		file.Close()
 		t.Error("opening for writing through the mount succeeded")
 	}
 }
 
 func TestModesReportThemselvesReadOnly(t *testing.T) {
-	target := serve(t, "global\n", func(target string) {
-		repo(t, target, "global", map[string]string{"skills/commit/SKILL.md": "x"})
-	})
-	info, err := os.Stat(filepath.Join(target, "skills", "commit", "SKILL.md"))
+	f := declare(t, []string{"skills"}, "global")
+	f.repo(t, "global", map[string]string{"skills/commit/SKILL.md": "x"})
+	info, err := os.Stat(filepath.Join(f.serve(t), "skills", "commit", "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,12 +185,10 @@ func TestModesReportThemselvesReadOnly(t *testing.T) {
 // The editing loop this project exists to serve: change the file in its
 // repository, read it through the mount, see the change with no intervention.
 func TestEditsInASourceAreVisibleWithoutRemounting(t *testing.T) {
-	var backing string
-	target := serve(t, "global\n", func(target string) {
-		repo(t, target, "global", map[string]string{"skills/commit/SKILL.md": "before"})
-		backing = filepath.Join(target, "global", "skills")
-	})
-	through := filepath.Join(target, "skills")
+	f := declare(t, []string{"skills"}, "global")
+	f.repo(t, "global", map[string]string{"skills/commit/SKILL.md": "before"})
+	backing := filepath.Join(f.dir, "global", "skills")
+	through := filepath.Join(f.serve(t), "skills")
 
 	if got := readFile(t, filepath.Join(through, "commit", "SKILL.md")); got != "before" {
 		t.Fatalf("got %q", got)
@@ -188,11 +213,11 @@ func TestEditsInASourceAreVisibleWithoutRemounting(t *testing.T) {
 }
 
 func TestSymlinksInASourceAreServedAsSuch(t *testing.T) {
-	var backing string
-	target := serve(t, "global\n", func(target string) {
-		repo(t, target, "global", map[string]string{"skills/commit/SKILL.md": "x"})
-		backing = filepath.Join(target, "global", "skills", "commit")
-	})
+	f := declare(t, []string{"skills"}, "global")
+	f.repo(t, "global", map[string]string{"skills/commit/SKILL.md": "x"})
+	backing := filepath.Join(f.dir, "global", "skills", "commit")
+	target := f.serve(t)
+
 	if err := os.Symlink("SKILL.md", filepath.Join(backing, "alias.md")); err != nil {
 		t.Fatal(err)
 	}
@@ -209,30 +234,45 @@ func TestSymlinksInASourceAreServedAsSuch(t *testing.T) {
 	}
 }
 
+// A source that is not there fails the workspace declaring it, and does so
+// before anything is mounted.
+func TestAbsentSourceIsRefused(t *testing.T) {
+	if err := mount.Preflight(); err != nil {
+		t.Skipf("host cannot mount: %v", err)
+	}
+	f := declare(t, []string{"skills"}, "global")
+	f.workspace.Sources = append(f.workspace.Sources, path(filepath.Join(f.dir, "absent")))
+
+	server, err := mount.Serve(f.workspace)
+	if err == nil {
+		server.Unmount()
+		t.Fatal("a workspace with a missing source was established")
+	}
+	if !airfs.IsPrecondition(err) {
+		t.Errorf("err = %v; want a precondition error", err)
+	}
+	if mounted := mount.Under(mounts(t), f.workspace.Target.Resolved); len(mounted) != 0 {
+		t.Errorf("a failed attempt left %v mounted", mounted)
+	}
+}
+
 // Mounting over a populated directory hides its contents, and the hidden files
 // are a trap.
 func TestNonEmptyMountpointIsRefused(t *testing.T) {
 	if err := mount.Preflight(); err != nil {
 		t.Skipf("host cannot mount: %v", err)
 	}
-	target := t.TempDir()
-	repo(t, target, "global", map[string]string{"skills/commit/SKILL.md": "x"})
-	if err := os.MkdirAll(filepath.Join(target, "skills"), 0o755); err != nil {
+	f := declare(t, []string{"skills", "commands"}, "global")
+	f.repo(t, "global", map[string]string{"skills/commit/SKILL.md": "x"})
+	stray := filepath.Join(f.workspace.Target.Resolved, "commands", "stray.md")
+	if err := os.MkdirAll(filepath.Dir(stray), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(target, "skills", "stray.md"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	config := filepath.Join(target, sources.FileName)
-	if err := os.WriteFile(config, []byte("global\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := sources.Load(config)
-	if err != nil {
+	if err := os.WriteFile(stray, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	server, err := mount.Serve(target, cfg)
+	server, err := mount.Serve(f.workspace)
 	if err == nil {
 		server.Unmount()
 		t.Fatal("mounting over a populated directory succeeded")
@@ -241,87 +281,72 @@ func TestNonEmptyMountpointIsRefused(t *testing.T) {
 		t.Errorf("err = %v; want a precondition error", err)
 	}
 
-	// A failed attempt leaves nothing behind: no kind is left mounted.
-	states, err := mount.Status(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, st := range states {
-		if st.Mounted {
-			t.Errorf("%s stayed mounted after a failed attempt", st.Kind)
-		}
+	// Folders are established together and released together: the one that did
+	// mount is not left behind, because a half-served workspace lies about what
+	// is available.
+	if mounted := mount.Under(mounts(t), f.workspace.Target.Resolved); len(mounted) != 0 {
+		t.Errorf("a failed attempt left %v mounted", mounted)
 	}
 }
 
-func TestStatusAndUnmountReadTheKernel(t *testing.T) {
+func TestTheKernelIsTheInventory(t *testing.T) {
 	if err := mount.Preflight(); err != nil {
 		t.Skipf("host cannot mount: %v", err)
 	}
-	target := t.TempDir()
-	repo(t, target, "global", map[string]string{"skills/commit/SKILL.md": "x"})
-	config := filepath.Join(target, sources.FileName)
-	if err := os.WriteFile(config, []byte("global\n"), 0o644); err != nil {
-		t.Fatal(err)
+	f := declare(t, []string{"skills"}, "global")
+	f.repo(t, "global", map[string]string{"skills/commit/SKILL.md": "x"})
+	target := f.workspace.Target.Resolved
+
+	// Nothing mounted yet, and releasing nothing is safe rather than an error.
+	if mounted := mount.Under(mounts(t), target); len(mounted) != 0 {
+		t.Errorf("reported as mounted before mounting: %v", mounted)
 	}
-	cfg, err := sources.Load(config)
-	if err != nil {
-		t.Fatal(err)
+	if released, err := mount.UnmountAll(nil); err != nil || len(released) != 0 {
+		t.Errorf("releasing nothing: %v, %v", released, err)
 	}
 
-	// Nothing mounted yet, and unmounting is safe rather than an error.
-	states, err := mount.Status(target)
-	if err != nil {
+	if _, err := mount.Serve(f.workspace); err != nil {
 		t.Fatal(err)
 	}
-	if mount.Served(states) {
-		t.Error("reported as served before mounting")
+	mounted := mount.Under(mounts(t), target)
+	if len(mounted) != 1 || mounted[0].Dir != filepath.Join(target, "skills") {
+		t.Errorf("the kernel reports %v, want the workspace's one folder", mounted)
 	}
-	released, err := mount.Unmount(target)
-	if err != nil || len(released) != 0 {
-		t.Errorf("unmounting nothing: %v, %v", released, err)
+	if mounted[0].Stale {
+		t.Error("a live mount is reported as stale")
 	}
 
-	if _, err := mount.Serve(target, cfg); err != nil {
-		t.Fatal(err)
-	}
-	states, err = mount.Status(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !mount.Served(states) {
-		t.Errorf("not reported as served: %+v", states)
-	}
-
-	// A second serve of the same target is detected rather than stacked.
-	if _, err := mount.Serve(target, cfg); err == nil {
-		t.Error("mounting an already served target succeeded")
+	// A second serve of the same workspace is detected rather than stacked.
+	if _, err := mount.Serve(f.workspace); err == nil {
+		t.Error("mounting an already served workspace succeeded")
 	} else if !airfs.IsPrecondition(err) {
 		t.Errorf("err = %v; want a precondition error", err)
 	}
 
-	released, err = mount.Unmount(target)
+	released, err := mount.UnmountAll(mounted)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(released) != len(airfs.Kinds) {
-		t.Errorf("released %v, want every kind", released)
+	if len(released) != 1 {
+		t.Errorf("released %v, want the one folder", released)
 	}
 	waitUnmounted(t, target)
+}
+
+func mounts(t *testing.T) []mount.Mount {
+	t.Helper()
+	all, err := mount.Mounts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return all
 }
 
 func waitUnmounted(t *testing.T, target string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		states, err := mount.Status(target)
-		if err != nil {
-			t.Fatal(err)
-		}
-		mounted := false
-		for _, st := range states {
-			mounted = mounted || st.Mounted
-		}
-		if !mounted {
+		if len(mount.Under(mounts(t), target)) == 0 {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)

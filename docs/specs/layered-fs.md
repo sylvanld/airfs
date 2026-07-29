@@ -72,10 +72,19 @@ file that rejects every write is worse than reporting the truth.
 - **An entry named identically in two layers with different types** is a
   shadowing event like any other, and is reported as one, because a directory
   shadowing a file is far more likely to be a mistake than an intention.
-- **A layer that disappears while the view is live** yields errors from the
-  operations that touch it, not a silently different view. The union does not
-  cache the existence of names in order to paper over a source repository that
-  was moved or deleted.
+- **A layer whose root does not exist** contributes nothing, and the union of
+  the remaining layers is served normally. This is the ordinary case rather than
+  a broken one: a workspace declares the folders it wants merged, a source
+  contains the ones it has, and airfs creates neither. It is also what lets a
+  folder added to a source appear through the view without re-establishing it.
+- **A layer that becomes unreadable while the view is live** — permissions
+  revoked, the underlying device gone — yields errors from the operations that
+  touch it, not a silently different view. The union does not cache the
+  existence of names in order to paper over it. A source repository that was
+  moved or deleted falls under the case above and reads as empty; that it is
+  gone is reported by the daemon reconciling it, per
+  [daemon.md](daemon.md), which is where a missing *source* is a fact about the
+  configuration rather than about one folder.
 - **Concurrent reads** are safe: a union is immutable once constructed, and reads
   hold no shared mutable state. Changing the set of layers means constructing a
   new union.
