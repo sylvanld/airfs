@@ -18,9 +18,8 @@ The command line is a thin frontend over the library. It adds argument parsing,
 human-readable reporting, and exit codes — nothing else. Any behaviour it appears
 to add, another spec is missing.
 
-Every command reads the configuration of
-[workspace-config.md](workspace-config.md), and every command takes the same
-override:
+Every command about a workspace reads the configuration of
+[workspace-config.md](workspace-config.md), and takes the same override:
 
 - `--config <file>` — the configuration file to read. Defaults to
   `$XDG_CONFIG_HOME/airfs/config.yaml`. A `~`-prefixed path is expanded, and a
@@ -45,6 +44,12 @@ The surface splits in three, by what a command is *about*:
 - **Inspecting** — `ls`, `inspect`. Change nothing, and need nothing running.
 - **Running** — `up`, `down`, `reload`, `status`, `doctor`. Change or report what
   the daemon is doing, and write nothing.
+
+One command sits outside all three, because it is about a *project* rather than
+about this machine's workspaces: **`link`**, specified in [link.md](link.md). It
+reads no configuration, takes no `--config`, and needs no daemon. It is grouped
+apart rather than squeezed into one of the three, since a reader who expects it
+to declare or to serve something will be wrong about it either way.
 
 No command spans two groups, which is the distinction the previous design's
 `mount` lost: it served a view and rewrote a source list under one verb, and
@@ -200,6 +205,18 @@ report whether it is satisfied and, when it is not, which system package or
 setting provides it. This exists as its own command because the requirements are
 the project's most likely first failure, and a mount error alone does not
 explain which requirement is missing or what to install.
+
+## Linking
+
+**`link --<tool> …`** — point each named tool at the project's own resource
+root, adopting whatever it already holds. Its behaviour, its flags, its table of
+tools and what it refuses are [link.md](link.md); only its place in the surface
+belongs here.
+
+It is the one command whose frame of reference is the working directory rather
+than a named workspace, and the one that writes into a project rather than into
+the configuration or the mount table. It exits `2` when any named tool was
+refused, having linked every other one.
 
 ## Reporting and exit codes
 

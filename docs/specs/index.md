@@ -17,4 +17,5 @@ it.
 | [layered-fs.md](layered-fs.md) | Ordered read-only `fs.FS` union: lookup, listing, dedup, edge cases | implemented |
 | [fuse-mount.md](fuse-mount.md) | Serving a folder's union as one read-only FUSE mount, in pure Go | implemented |
 | [cli.md](cli.md) | The `airfs` command surface and its exit codes | implemented |
+| [link.md](link.md) | `airfs link` — symlinking a project's own skills to where each tool looks | accepted |
 | [source-config.md](source-config.md) | Per-target `sources.txt` — superseded by [workspace-config.md](workspace-config.md) | superseded |
