@@ -21,7 +21,7 @@ Every page below uses these words in exactly this sense.
 | **Source** (layer) | One contributing directory tree, normally a git working copy. Sources are an *ordered* list. |
 | **Folder** | A subdirectory name that gets merged and mounted — `skills`, `prompts`, whatever you declare. `airfs` attaches no meaning to any of them. |
 | **Entry** | One resource within a folder, named directly under it — a directory like a skill, or a single file like a command. |
-| **Target** | The directory a workspace's merged view is exposed under. It holds one mountpoint per folder and nothing else. |
+| **Target** | The directory a workspace's merged view is exposed under. `airfs` claims one mountpoint per folder inside it and nothing more; anything else the directory holds is untouched. |
 | **Workspace** | One named declaration: a target, an ordered list of sources, and the folders to merge. The unit everything is reported and controlled by. |
 
 ## The commands, by what they are about 🛠️

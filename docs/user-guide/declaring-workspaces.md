@@ -37,10 +37,30 @@ command line without quoting.
 
 | Field | Required | Means |
 | --- | --- | --- |
-| `target` | ✅ | The directory the merged view is exposed under. It holds one mounted subdirectory per folder, and **nothing else**. |
+| `target` | ✅ | The directory the merged view is exposed under. `airfs` claims one mounted subdirectory per folder inside it and **nothing more**. |
 | `sources` | ✅ | The contributing directory trees, in precedence order — most general first, last wins. At least one. |
 | `folders` | — | The subdirectory names to merge and mount. Defaults to `[agents, skills, commands, scripts]`. |
 | `enabled` | — | Whether it is served. Defaults to `true`. |
+
+### `target` — a directory `airfs` shares 🏠
+
+A target does **not** have to be a directory `airfs` owns. It claims the folder
+subdirectories and nothing more, so pointing a workspace at a directory a tool
+already fills with its own files is normal use:
+
+```yaml
+workspaces:
+  myproject-claude:
+    target: ~/work/myproject/.claude   # settings.json, CLAUDE.md — all untouched
+    folders: [skills]                  # only .claude/skills/ is a mountpoint
+    sources:
+      - ~/repos/org-capabilities
+      - ~/work/myproject/.skills       # the project's own, winning
+```
+
+The one requirement is on the **folder subdirectories**: each must be absent, or
+present and empty. `airfs` creates the missing ones and refuses a populated one,
+because mounting over it would hide the files inside. 🫥
 
 ### `folders` — you name them, not `airfs` 🏷️
 
@@ -191,6 +211,7 @@ it, so fixing one typo does not make you run the command again to find the next.
 These are **reported, not fatal** — they fail only the workspace concerned, and
 every other workspace is served normally:
 
+- A folder subdirectory inside the target that already exists and is not empty.
 - A declared source directory that does not exist.
 - A source that exists but lacks one of the folders.
 - A folder no source contributes an entry to.

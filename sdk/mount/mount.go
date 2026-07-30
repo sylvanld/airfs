@@ -45,8 +45,10 @@ type Server struct {
 // ready. It does not block; call Wait to serve until unmounted.
 //
 // If any folder fails to mount, every folder already mounted for that
-// workspace is released before returning, so a failed attempt leaves nothing
-// behind.
+// workspace is released before returning, so a failed attempt leaves no mount
+// behind. Folder directories created on the way are left: they are empty, the
+// next attempt mounts over them, and removing one risks removing a directory
+// that was already there.
 func Serve(w *config.Workspace) (*Server, error) {
 	if err := Preflight(); err != nil {
 		return nil, err

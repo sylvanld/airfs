@@ -55,9 +55,11 @@ name: a directory entry wins with its entire subtree.
 `<source>/<folder>/` directory. A folder's merged view is the ordered stack of
 its strata.
 
-**Target** — the directory a workspace's merged view is exposed under, holding
-one subdirectory per folder and nothing else. The target is not a mountpoint;
-each of its folder directories is.
+**Target** — the directory a workspace's merged view is exposed under. The
+target is not a mountpoint; each of its folder directories is. A target may hold
+anything else besides: `airfs` claims its folder subdirectories and nothing more,
+which is what lets a workspace expose `skills/` inside a directory that a tool
+already owns and fills with its own files.
 
 **Workspace** — a named target, an ordered list of sources, and the folders it
 carries. It is the unit that is declared, established, and reported on; a

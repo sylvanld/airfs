@@ -70,7 +70,7 @@ quoting.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `target` | yes | The directory the merged view is exposed under. Holds one mounted subdirectory per folder, and nothing else. |
+| `target` | yes | The directory the merged view is exposed under. `airfs` claims one mounted subdirectory per folder within it, and nothing more; whatever else the directory holds is untouched. |
 | `sources` | yes | The contributing directory trees, in precedence order — most general first, last wins. At least one. |
 | `folders` | no | The subdirectory names that are merged and mounted. Defaults to `[agents, skills, commands, scripts]`. |
 | `enabled` | no | Whether the workspace is established. Defaults to `true` when absent. |

@@ -84,8 +84,9 @@ Five words carry the whole model.
 
 -   **🎯 Target**
 
-    The directory a workspace's merged view is exposed under. It holds one
-    mountpoint per folder, and nothing else.
+    The directory a workspace's merged view is exposed under. `airfs` claims one
+    mountpoint per folder inside it and nothing more, so a target can be a
+    directory a tool already owns.
 
 -   **🪟 Workspace**
 
@@ -142,7 +143,7 @@ One FUSE mount **per folder**, and one daemon holding every workspace on the
 machine:
 
 ```
-~/.ai-resources/        # a target holds mountpoints, and nothing else
+~/.ai-resources/        # the target; airfs claims only the folders below it
   agents/               # mountpoint
   skills/               # mountpoint
   commands/             # mountpoint

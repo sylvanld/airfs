@@ -100,7 +100,10 @@ that exists and is not empty is refused, because mounting over populated
 directories hides their contents and the hidden files are a trap; a folder
 already serving this view is detected and reported rather than stacked. If any
 folder fails to mount, every folder already mounted for that workspace is
-released before reporting, so a failed attempt leaves nothing behind.
+released before reporting, so a failed attempt leaves no mount behind. Folder
+directories it created on the way are not removed: they are empty, the next
+attempt mounts over them, and deleting a directory to undo a failure risks
+deleting one that was already there.
 
 Releasing a workspace unmounts every folder under its target, and is safe to
 invoke when nothing is mounted, reporting that fact rather than failing.
