@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -42,11 +43,12 @@ func cmdUp(args []string) error {
 			return err
 		}
 		reportStatus(status, path)
-		if err := reportMounts(status, ""); err != nil {
+		mounted, err := reportMounts(status, "")
+		if err != nil {
 			return err
 		}
 		fmt.Println("\nServing in the background. Stop it with: airfs down")
-		if !status.Served() {
+		if !status.Served() || !mounted {
 			return airfs.Precondition(airfs.ErrReported)
 		}
 		return nil
@@ -176,10 +178,11 @@ func cmdStatus(args []string) error {
 		}
 	}
 	served := reportStatus(status, path)
-	if err := reportMounts(status, only); err != nil {
+	mounted, err := reportMounts(status, only)
+	if err != nil {
 		return err
 	}
-	if served {
+	if served && mounted {
 		return nil
 	}
 	// A disabled workspace serving nothing is the configuration being honoured,
@@ -243,25 +246,34 @@ func reportStatus(status *daemon.Status, wouldRead string) bool {
 	return status.Served()
 }
 
-// reportMounts prints the fourth point: what is mounted, from the kernel.
+// reportMounts prints the fourth point: what is mounted, from the kernel. It
+// also says whether every folder of every established workspace is there and
+// live, which is the exit code's other half.
+//
+// That is a different question from the one the daemon answers. The daemon
+// reports what it established; the kernel reports what is mounted now, and the
+// two part company the moment something releases a mount from under a running
+// daemon — leaving it saying "served" about a directory the kernel no longer
+// carries. Only the kernel can catch that, which is why the code turns on it.
 //
 // It is answerable with no daemon alive, which is the state that most needs
 // reporting: status on a dead daemon still reports every airfs mount left on
 // the machine.
-func reportMounts(status *daemon.Status, only string) error {
+func reportMounts(status *daemon.Status, only string) (bool, error) {
 	mounts, err := mount.Mounts()
 	if err != nil {
-		return err
+		return false, err
+	}
+	live := map[string]mount.Mount{}
+	for _, m := range mounts {
+		live[m.Dir] = m
 	}
 	fmt.Println()
-	if len(mounts) == 0 {
-		fmt.Println("Nothing is mounted.")
-		return nil
-	}
 
 	// Mounts are grouped under the workspace whose target holds them, so that
 	// what the kernel reports lines up with what the file declares. One that
 	// belongs to no declared workspace is named as such rather than omitted.
+	complete, reported := true, false
 	accounted := map[string]bool{}
 	if status != nil {
 		for _, w := range status.Workspaces {
@@ -269,10 +281,32 @@ func reportMounts(status *daemon.Status, only string) error {
 				continue
 			}
 			var lines []string
-			for _, m := range mounts {
+			for _, folder := range w.Folders {
 				// Matched against the resolved target: the kernel reports
 				// absolute paths, and a target declared as `~/x` is not one.
-				if !strings.HasPrefix(m.Dir, strings.TrimSuffix(w.TargetDir, "/")+"/") {
+				dir := filepath.Join(strings.TrimSuffix(w.TargetDir, "/"), folder)
+				m, ok := live[dir]
+				if !ok {
+					// A folder of an established workspace that the kernel does
+					// not carry is the state most worth naming: every other
+					// report on the machine still calls the workspace served.
+					if w.Established {
+						complete = false
+						lines = append(lines, dir+"  NOT MOUNTED — recover with airfs down, then airfs up")
+					}
+					continue
+				}
+				accounted[dir] = true
+				if w.Established && m.Stale {
+					complete = false
+				}
+				lines = append(lines, describe(m))
+			}
+			// Anything else the kernel carries under this target belongs to the
+			// workspace too — a folder it no longer declares, most likely — and
+			// is named here rather than counted a stray.
+			for _, m := range mounts {
+				if accounted[m.Dir] || !strings.HasPrefix(m.Dir, strings.TrimSuffix(w.TargetDir, "/")+"/") {
 					continue
 				}
 				accounted[m.Dir] = true
@@ -281,6 +315,7 @@ func reportMounts(status *daemon.Status, only string) error {
 			if len(lines) == 0 {
 				continue
 			}
+			reported = true
 			fmt.Printf("Mounted for %s:\n", w.Name)
 			for _, line := range lines {
 				fmt.Printf("  %s\n", line)
@@ -288,7 +323,10 @@ func reportMounts(status *daemon.Status, only string) error {
 		}
 	}
 	if only != "" {
-		return nil
+		if !reported {
+			fmt.Println("Nothing is mounted.")
+		}
+		return complete, nil
 	}
 
 	var stray []mount.Mount
@@ -298,13 +336,17 @@ func reportMounts(status *daemon.Status, only string) error {
 		}
 	}
 	if len(stray) > 0 {
+		reported = true
 		fmt.Println("Mounted, belonging to no declared workspace:")
 		for _, m := range stray {
 			fmt.Printf("  %s\n", describe(m))
 		}
 		fmt.Println("\nRelease these with: airfs down")
 	}
-	return nil
+	if !reported {
+		fmt.Println("Nothing is mounted.")
+	}
+	return complete, nil
 }
 
 // describe names one mount and its condition. A stale mountpoint looks mounted

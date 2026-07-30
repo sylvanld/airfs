@@ -117,6 +117,7 @@ They are not the same thing, and neither writes anything the other reads:
 ```
 daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
 config  /home/you/.config/airfs/config.yaml
+        last reloaded Mon, 28 Jul 2026 11:02:40 CEST
 
   personal  served     ~/.ai
   work      NOT SERVED ~/work/.ai — source ~/work/project-capabilities: no such file or directory
@@ -129,12 +130,31 @@ Mounted for personal:
 
 In order, it tells you:
 
-1. **Whether a daemon is running**, and since when.
+1. **Whether a daemon is running**, and since when — plus when it last reloaded,
+   when that is not when it started.
 2. **Which configuration file it loaded** — the one the daemon actually holds,
    not the one this command would read.
 3. **Every workspace that file declares**: enabled or disabled, served or not,
    with the reason when an enabled one is not.
-4. **What is mounted**, per workspace, per folder — including anything stale.
+4. **What is mounted**, per workspace, per folder — from the kernel, so it
+   includes anything stale and anything the daemon does not account for.
+
+!!! warning "Line 3 and line 4 can disagree, and that is the point"
+
+    The daemon reports what it *established*; the kernel reports what is mounted
+    *now*. Something that releases a mount from under a running daemon —
+    `fusermount3 -u`, another `airfs down`, a container teardown — leaves the
+    daemon still calling the workspace `served`, so the folder is named instead:
+
+    ```
+      personal  served     ~/.ai
+
+    Mounted for personal:
+      /home/you/.ai/skills  NOT MOUNTED — recover with airfs down, then airfs up
+    ```
+
+    A missing or stale mountpoint makes `status` exit `2` however healthy the
+    daemon believes it is. 🚨
 
 !!! danger "Watch line 2"
 
@@ -151,9 +171,10 @@ come from the daemon and are reported as unavailable when there is none.
 workspace *merges* — that is [`airfs inspect`](precedence.md), and it is true
 whether or not anything is running.
 
-**Exit code:** `0` when every enabled workspace is fully served, `2` when any is
-not. A disabled workspace serving nothing is the configuration being honoured, so
-it does not affect the code.
+**Exit code:** `0` when every enabled workspace is fully served — declared,
+established, and every folder actually mounted — and `2` when any is not. A
+disabled workspace serving nothing is the configuration being honoured, so it
+does not affect the code.
 
 ## Across reboots: systemd, optionally ♻️
 

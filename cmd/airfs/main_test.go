@@ -9,6 +9,7 @@ import (
 
 	"github.com/sylvanld/airfs/sdk"
 	"github.com/sylvanld/airfs/sdk/config"
+	"github.com/sylvanld/airfs/sdk/daemon"
 )
 
 // invoke runs a command as the shell would and returns what it printed and the
@@ -19,6 +20,15 @@ import (
 // configuration is never read. What is left is the frontend's own job:
 // argument parsing, reporting, and exit codes.
 func invoke(t *testing.T, args ...string) (string, int) {
+	t.Helper()
+	var code int
+	return capture(t, func() { code = run(args) }), code
+}
+
+// capture runs f with both output streams redirected and returns what it
+// printed, for the reports that are worth asserting on without a command
+// around them.
+func capture(t *testing.T, f func()) string {
 	t.Helper()
 	stdout, stderr := os.Stdout, os.Stderr
 	r, w, err := os.Pipe()
@@ -33,10 +43,10 @@ func invoke(t *testing.T, args ...string) (string, int) {
 		done <- string(out)
 	}()
 
-	code := run(args)
+	f()
 	w.Close()
 	os.Stdout, os.Stderr = stdout, stderr
-	return <-done, code
+	return <-done
 }
 
 // workspace prepares a machine with a configuration path and two source
@@ -275,6 +285,34 @@ func TestStatusWithNoDaemonReportsThatAndSaysWhatItWouldRead(t *testing.T) {
 	}
 	if !strings.Contains(out, "airfs up") {
 		t.Errorf("status must say how to start one:\n%s", out)
+	}
+}
+
+func TestAnEstablishedWorkspaceWhoseMountsAreGoneIsNotServed(t *testing.T) {
+	// The daemon reports what it established; only the kernel knows what is
+	// mounted now. Something releasing a mount from under a running daemon
+	// leaves it calling the workspace served, and status must not repeat that.
+	target := t.TempDir()
+	status := &daemon.Status{Workspaces: []daemon.WorkspaceStatus{{
+		Name: "personal", Target: target, TargetDir: target,
+		Folders: []string{"skills"}, Enabled: true, Established: true,
+	}}}
+
+	var mounted bool
+	out := capture(t, func() {
+		var err error
+		if mounted, err = reportMounts(status, "personal"); err != nil {
+			t.Error(err)
+		}
+	})
+	if mounted {
+		t.Error("a workspace with no mount under its target must not count as mounted")
+	}
+	if !strings.Contains(out, "NOT MOUNTED") {
+		t.Errorf("status must name the folder the kernel does not carry:\n%s", out)
+	}
+	if !strings.Contains(out, filepath.Join(target, "skills")) {
+		t.Errorf("status must name the mountpoint:\n%s", out)
 	}
 }
 

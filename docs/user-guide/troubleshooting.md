@@ -100,12 +100,18 @@ win whole rather than file by file.
 **The workspace is disabled.** `airfs status` says so plainly, and it is the
 configuration being honoured rather than a failure. `airfs enable <name>`.
 
-**The mount is stale.** The serving process died, and the kernel still lists the
-mountpoint while every access to it fails:
+**The mount is stale, or gone.** Either the serving process died and the kernel
+still lists the mountpoint while every access to it fails, or something released
+the mount from under a daemon that is still running and still calls the
+workspace `served`:
 
 ```
   /home/you/.ai/skills  STALE — its serving process died; recover with airfs down
+  /home/you/.ai/skills  NOT MOUNTED — recover with airfs down, then airfs up
 ```
+
+`status` reads the kernel for this, so it catches both however healthy the
+daemon believes it is, and exits `2` either way. The recovery is the same:
 
 ```bash
 airfs down && airfs up --detach
