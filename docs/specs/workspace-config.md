@@ -31,8 +31,9 @@ answers questions about one workspace at a time. A workspace is not
 self-describing under this spec, and that is deliberate — the file is the
 inventory, and a target directory is only ever an output.
 
-A target therefore no longer holds anything but its mounted subfolders. Nothing
-is written into a target other than the mountpoints themselves.
+Nothing is written into a target other than the mountpoints themselves. What
+else the directory holds is not `airfs`'s business and is left alone, which is
+what allows a target to be a directory some tool already owns.
 
 ## Format
 
@@ -44,14 +45,14 @@ is a line added inside a named block.
 ```yaml
 workspaces:
   personal:
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills, commands]
     sources:
       - ~/repos/personal-capabilities
       - ~/repos/org-capabilities
 
   work:
-    target: ~/work/.ai-resources
+    target: ~/work/.ai
     folders: [skills, prompts]
     sources:
       - ~/repos/org-capabilities
@@ -107,7 +108,7 @@ already provides:
 ```yaml
 workspaces:
   personal: &base
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills]
     sources: [~/repos/personal-capabilities]
   scratch:

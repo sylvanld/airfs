@@ -26,13 +26,13 @@ func TestLoadResolvesWorkspaces(t *testing.T) {
 	path := write(t, `
 workspaces:
   personal:
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills]
     sources:
       - ~/repos/mine
       - $PROJECTS/shared
   work:
-    target: /work/.ai-resources
+    target: /work/.ai
     sources: [./relative-source]
     enabled: false
 `)
@@ -46,10 +46,10 @@ workspaces:
 	}
 
 	personal := cfg.Lookup("personal")
-	if personal.Target.Resolved != "/home/tester/.ai-resources" {
+	if personal.Target.Resolved != "/home/tester/.ai" {
 		t.Errorf("target resolved to %q", personal.Target.Resolved)
 	}
-	if personal.Target.Declared != "~/.ai-resources" {
+	if personal.Target.Declared != "~/.ai" {
 		t.Errorf("target declared as %q; reports must name what the author wrote", personal.Target.Declared)
 	}
 	if got := personal.Sources[1].Resolved; got != "/srv/projects/shared" {
@@ -82,7 +82,7 @@ func TestLoadResolvesMergeKeys(t *testing.T) {
 	cfg, err := config.Load(write(t, `
 workspaces:
   personal: &base
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [skills]
     sources: [~/repos/mine]
   scratch:

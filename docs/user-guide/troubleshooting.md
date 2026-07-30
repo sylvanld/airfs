@@ -104,7 +104,7 @@ configuration being honoured rather than a failure. `airfs enable <name>`.
 mountpoint while every access to it fails:
 
 ```
-  /home/you/.ai-resources/skills  STALE — its serving process died; recover with airfs down
+  /home/you/.ai/skills  STALE — its serving process died; recover with airfs down
 ```
 
 ```bash
@@ -132,7 +132,7 @@ must not take down the rest, so a workspace that cannot be established fails
 **alone** and everything else is served:
 
 ```
-  work      NOT SERVED ~/work/.ai-resources — source ~/work/client-acme: no such file or directory
+  work      NOT SERVED ~/work/.ai — source ~/work/client-acme: no such file or directory
 ```
 
 Fix the reason and run `airfs reload`. There is no retry timer and no backoff:
@@ -144,7 +144,7 @@ The mountpoint has files in it, and mounting over them would hide them —
 silently, until someone spends an afternoon on it. Look before you clear it:
 
 ```bash
-ls -la ~/.ai-resources/skills
+ls -la ~/.ai/skills
 ```
 
 If it is a leftover copy of resources you are now layering, delete it. If it is

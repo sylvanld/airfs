@@ -25,7 +25,7 @@ func TestEditPreservesWhatAPersonWrote(t *testing.T) {
 workspaces:
   # My own capabilities, shared by everything below.
   personal: &base
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills]
     sources:
       - ~/repos/mine # authored by me
@@ -89,7 +89,7 @@ func TestDeclareCreatesTheFile(t *testing.T) {
 	changed, err := config.Edit(path, func(f *config.File) error {
 		return f.Declare(config.Declaration{
 			Name:    "personal",
-			Target:  "~/.ai-resources",
+			Target:  "~/.ai",
 			Sources: []string{"~/repos/mine"},
 			Folders: []string{"skills"},
 			Enabled: true,
@@ -110,7 +110,7 @@ func TestDeclareCreatesTheFile(t *testing.T) {
 	}
 	// The path is written as it was typed, so the file keeps the form its
 	// author would recognise.
-	if got := read(t, path); !strings.Contains(got, "~/.ai-resources") {
+	if got := read(t, path); !strings.Contains(got, "~/.ai") {
 		t.Errorf("the target was not written as typed:\n%s", got)
 	}
 }

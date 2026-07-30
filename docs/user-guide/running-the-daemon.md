@@ -16,7 +16,7 @@ airfs status          # what is the daemon doing?
 Each **folder** of each workspace is its own mount:
 
 ```
-~/.ai-resources/
+~/.ai/
   agents/         # mountpoint
   skills/         # mountpoint
   commands/       # mountpoint
@@ -118,13 +118,13 @@ They are not the same thing, and neither writes anything the other reads:
 daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
 config  /home/you/.config/airfs/config.yaml
 
-  personal  served     ~/.ai-resources
-  work      NOT SERVED ~/work/.ai-resources — source ~/work/project-capabilities: no such file or directory
+  personal  served     ~/.ai
+  work      NOT SERVED ~/work/.ai — source ~/work/project-capabilities: no such file or directory
   scratch   disabled
 
 Mounted for personal:
-  /home/you/.ai-resources/agents  0 entries
-  /home/you/.ai-resources/skills  7 entries
+  /home/you/.ai/agents  0 entries
+  /home/you/.ai/skills  7 entries
 ```
 
 In order, it tells you:

@@ -16,7 +16,7 @@ daemon**, so "what is `airfs` doing here?" has one answer you can read and diff.
 Your agent tooling wants every skill under one directory:
 
 ```
-~/.ai-resources/skills/
+~/.ai/skills/
 ```
 
 But skills are authored in the repository that *owns* them — one per team, per
@@ -41,7 +41,7 @@ flowchart LR
 
     M{{"🪄 airfs<br/>read-only merge"}}:::mid
 
-    V["👀 ~/.ai-resources/skills/<br/><i>merged view</i>"]:::out
+    V["👀 ~/.ai/skills/<br/><i>merged view</i>"]:::out
 
     A --> M
     B --> M
@@ -143,10 +143,10 @@ One FUSE mount **per folder**, and one daemon holding every workspace on the
 machine:
 
 ```
-~/.ai-resources/        # the target; airfs claims only the folders below it
-  agents/               # mountpoint
-  skills/               # mountpoint
-  commands/             # mountpoint
+~/.ai/          # the target; airfs claims only the folders below it
+  agents/       # mountpoint
+  skills/       # mountpoint
+  commands/     # mountpoint
 ```
 
 `airfs up` starts the daemon and serves every enabled workspace; `--detach` gives
@@ -183,14 +183,14 @@ One YAML file at `~/.config/airfs/config.yaml`, describing the whole machine:
 ```yaml
 workspaces:
   personal:
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills, commands]
     sources:
       - ~/repos/personal-capabilities   # 1st — most general
       - ~/repos/org-capabilities        # 2nd — wins every collision
 
   work:
-    target: ~/work/.ai-resources
+    target: ~/work/.ai
     folders: [skills, prompts]
     sources:
       - ~/repos/org-capabilities

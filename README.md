@@ -37,7 +37,7 @@ flowchart LR
     C["📦 project capabilities"]
     D["🧪 temporary capabilities"]
     M{{"🪄 airfs<br/>layered view"}}
-    V["👀 ~/.ai-resources/skills/<br/><i>the workspace</i>"]
+    V["👀 ~/.ai/skills/<br/><i>the workspace</i>"]
 
     A --> M
     B --> M
@@ -94,7 +94,7 @@ A target holds one FUSE mount per **folder** the workspace declares, and nothing
 else:
 
 ```
-~/.ai-resources/
+~/.ai/
   agents/         # mountpoint
   skills/         # mountpoint
   commands/       # mountpoint
@@ -119,7 +119,7 @@ One YAML file at `~/.config/airfs/config.yaml`:
 ```yaml
 workspaces:
   personal:
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills, commands]
     sources:
       - ~/repos/personal-capabilities   # 1st - most general

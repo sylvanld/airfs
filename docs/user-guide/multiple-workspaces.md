@@ -9,14 +9,14 @@ work, one per project — rather than one global pile.
 ```yaml
 workspaces:
   personal:
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills, commands]
     sources:
       - ~/ai/personal
       - ~/ai/shared
 
   work:
-    target: ~/work/.ai-resources
+    target: ~/work/.ai
     folders: [skills, prompts]
     sources:
       - ~/ai/personal          # read by both; written by neither
@@ -87,8 +87,8 @@ configuration next to the repositories it names.
 ```
 config  /home/you/.config/airfs/config.yaml
 
-  personal  enabled   ~/.ai-resources       [agents skills commands]  2 sources
-  work      enabled   ~/work/.ai-resources  [skills prompts]          3 sources
+  personal  enabled   ~/.ai       [agents skills commands]  2 sources
+  work      enabled   ~/work/.ai  [skills prompts]          3 sources
   scratch   disabled  /tmp/scratch-ws       [skills]                  2 sources
 ```
 

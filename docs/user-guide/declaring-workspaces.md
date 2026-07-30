@@ -13,14 +13,14 @@ produces, findable only by already knowing where to look. 🔍
 ```yaml
 workspaces:
   personal:
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills, commands]
     sources:
       - ~/repos/personal-capabilities   # 1st — most general
       - ~/repos/org-capabilities        # 2nd — wins every collision
 
   work:
-    target: ~/work/.ai-resources
+    target: ~/work/.ai
     folders: [skills, prompts]
     sources:
       - ~/repos/org-capabilities
@@ -55,7 +55,7 @@ workspaces:
     folders: [skills]                  # only .claude/skills/ is a mountpoint
     sources:
       - ~/repos/org-capabilities
-      - ~/work/myproject/.skills       # the project's own, winning
+      - ~/work/myproject/.ai           # the project's own, winning
 ```
 
 The one requirement is on the **folder subdirectories**: each must be absent, or
@@ -114,7 +114,7 @@ name what you would recognise, not a resolved link target.
 ```yaml
 workspaces:
   personal: &base
-    target: ~/.ai-resources
+    target: ~/.ai
     folders: [agents, skills]
     sources: [~/repos/personal-capabilities]
 
@@ -158,7 +158,7 @@ working.
 
 ```bash
 airfs add personal \
-  --target ~/.ai-resources \
+  --target ~/.ai \
   -s ~/repos/personal-capabilities \
   -s ~/repos/org-capabilities \
   -f agents -f skills
@@ -182,7 +182,7 @@ you **quote them**, since otherwise your shell expands them before `airfs` ever
 sees them:
 
 ```bash
-airfs add personal --target '~/.ai-resources' -s '$WORK/ai-platform'
+airfs add personal --target '~/.ai' -s '$WORK/ai-platform'
 ```
 
 Quoting is what you want for a configuration you keep in git and share between

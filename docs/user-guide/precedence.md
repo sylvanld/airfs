@@ -70,7 +70,7 @@ airfs inspect personal
 
 ```
 workspace  personal
-target     ~/.ai-resources
+target     ~/.ai
 folders    agents, skills, commands
 
 Sources, in precedence order — the last declaration wins:

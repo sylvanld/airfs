@@ -95,7 +95,7 @@ flags **is** the precedence order: most general first, last wins.
 
 ```bash
 airfs add personal \
-  --target ~/.ai-resources \
+  --target ~/.ai \
   -s ~/ai/personal \
   -s ~/ai/project \
   -f skills
@@ -103,7 +103,7 @@ airfs add personal \
 
 ```
 Declared personal in /home/you/.config/airfs/config.yaml:
-  target   /home/you/.ai-resources
+  target   /home/you/.ai
   folders  skills
   sources, in precedence order — the last declaration wins:
     1. /home/you/ai/personal
@@ -138,7 +138,7 @@ airfs inspect personal
 
 ```
 workspace  personal
-target     /home/you/.ai-resources
+target     /home/you/.ai
 folders    skills
 
 Sources, in precedence order — the last declaration wins:
@@ -163,10 +163,10 @@ airfs up --detach
 daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
 config  /home/you/.config/airfs/config.yaml
 
-  personal  served     /home/you/.ai-resources
+  personal  served     /home/you/.ai
 
 Mounted for personal:
-  /home/you/.ai-resources/skills  2 entries
+  /home/you/.ai/skills  2 entries
 
 Serving in the background. Stop it with: airfs down
 ```
@@ -179,7 +179,7 @@ experimenting.
 ## 6. Read the merged view 👀
 
 ```bash
-ls ~/.ai-resources/skills
+ls ~/.ai/skills
 ```
 
 ```
@@ -189,7 +189,7 @@ commit  review
 One directory, both sources. And the winner won *whole*:
 
 ```bash
-cat ~/.ai-resources/skills/commit/SKILL.md
+cat ~/.ai/skills/commit/SKILL.md
 ```
 
 ```
@@ -201,7 +201,7 @@ and read it again through the view:
 
 ```bash
 echo "edited in place" > ~/ai/project/skills/commit/SKILL.md
-cat ~/.ai-resources/skills/commit/SKILL.md
+cat ~/.ai/skills/commit/SKILL.md
 ```
 
 ```
@@ -215,11 +215,11 @@ the same way — it appears in the listing immediately.
 The other direction is refused, by the kernel rather than by convention:
 
 ```bash
-touch ~/.ai-resources/skills/new.md
+touch ~/.ai/skills/new.md
 ```
 
 ```
-touch: cannot touch '/home/you/.ai-resources/skills/new.md': Read-only file system
+touch: cannot touch '/home/you/.ai/skills/new.md': Read-only file system
 ```
 
 A new file in the merged view would belong to *some* source, and the view has no
@@ -235,10 +235,10 @@ airfs status
 daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
 config  /home/you/.config/airfs/config.yaml
 
-  personal  served     /home/you/.ai-resources
+  personal  served     /home/you/.ai
 
 Mounted for personal:
-  /home/you/.ai-resources/skills  2 entries
+  /home/you/.ai/skills  2 entries
 ```
 
 `status` exits `0` when every enabled workspace is fully served and `2` when any
