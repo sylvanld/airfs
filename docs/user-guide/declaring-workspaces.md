@@ -156,11 +156,22 @@ list — a flag that quietly appended would produce an order nobody wrote. ⚠�
 The result is validated **before** it is written, so a mistyped path leaves your
 existing configuration standing.
 
-Paths are written down **as you typed them**, so `~` and `$VAR` survive into the
-file and it stays something you would have written by hand. The one exception is
-a path still relative after expansion: on a command line that means "from here",
-in the file it would mean "from the config file's directory", so it is made
-absolute first.
+Paths are written down **as `airfs` receives them**, so `~` and `$VAR` survive
+into the file and it stays something you would have written by hand — but only if
+you **quote them**, since otherwise your shell expands them before `airfs` ever
+sees them:
+
+```bash
+airfs add personal --target '~/.ai-resources' -s '$WORK/ai-platform'
+```
+
+Quoting is what you want for a configuration you keep in git and share between
+machines. Without it you get the absolute paths your shell produced, which is
+also perfectly valid — just machine-specific. 🎒
+
+The one exception to writing a path as received is one still relative after
+expansion: on a command line that means "from here", in the file it would mean
+"from the config file's directory", so it is made absolute first.
 
 ## What makes a configuration invalid 🚫
 

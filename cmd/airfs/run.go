@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -43,6 +42,9 @@ func cmdUp(args []string) error {
 			return err
 		}
 		reportStatus(status, path)
+		if err := reportMounts(status, ""); err != nil {
+			return err
+		}
 		fmt.Println("\nServing in the background. Stop it with: airfs down")
 		if !status.Served() {
 			return airfs.Precondition(airfs.ErrReported)
@@ -268,7 +270,9 @@ func reportMounts(status *daemon.Status, only string) error {
 			}
 			var lines []string
 			for _, m := range mounts {
-				if filepath.Dir(m.Dir) != w.Target && !strings.HasPrefix(m.Dir, w.Target+"/") {
+				// Matched against the resolved target: the kernel reports
+				// absolute paths, and a target declared as `~/x` is not one.
+				if !strings.HasPrefix(m.Dir, strings.TrimSuffix(w.TargetDir, "/")+"/") {
 					continue
 				}
 				accounted[m.Dir] = true

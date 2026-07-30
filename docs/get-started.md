@@ -103,22 +103,28 @@ airfs add personal \
 
 ```
 Declared personal in /home/you/.config/airfs/config.yaml:
-  target   ~/.ai-resources
+  target   /home/you/.ai-resources
   folders  skills
   sources, in precedence order — the last declaration wins:
-    1. ~/ai/personal
-    2. ~/ai/project
+    1. /home/you/ai/personal
+    2. /home/you/ai/project
 Changed: personal
 
 No daemon is running, so nothing was mounted or released.
 The configuration is written. Serve it with: airfs up
 ```
 
-Two things to notice. The paths were written down **as you typed them** — `~/ai/personal`
-stays that, rather than being frozen into `/home/you/...` — so the file stays
-something you would have written by hand. And the command wrote the file even
-though nothing is serving it yet: the declaration is the durable half. It exits
-`2` to say the machine has not caught up. 📝
+Notice that it wrote the file even though nothing is serving it yet: the
+declaration is the durable half. It exits `2` to say the machine has not caught
+up with it. 📝
+
+!!! tip "Want `~` and `$VAR` kept in the file?"
+
+    Quote them. `airfs` writes a path down **as it receives it**, so
+    `-s ~/ai/personal` arrives already expanded by your shell — while
+    `-s '~/ai/personal'` or `-s '$WORK/repo'` reaches `airfs` intact and stays
+    symbolic in the file, which is what you want for a configuration you keep in
+    git and share between machines. 🎒
 
 `-f skills` says which subdirectories to merge. Give none and you get the default
 set, `agents skills commands scripts`. **`airfs` attaches no meaning to any of
@@ -132,15 +138,15 @@ airfs inspect personal
 
 ```
 workspace  personal
-target     ~/.ai-resources
+target     /home/you/.ai-resources
 folders    skills
 
 Sources, in precedence order — the last declaration wins:
-  1. ~/ai/personal  skills 2
-  2. ~/ai/project   skills 1
+  1. /home/you/ai/personal  skills 2
+  2. /home/you/ai/project   skills 1
 
 Shadowed entries — the winner is what the view serves:
-  skills/commit  wins ~/ai/project  over ~/ai/personal
+  skills/commit  wins /home/you/ai/project  over /home/you/ai/personal
 ```
 
 Both sources ship a `commit` skill, so one has to lose. The report says which, by
@@ -157,7 +163,7 @@ airfs up --detach
 daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
 config  /home/you/.config/airfs/config.yaml
 
-  personal  served     ~/.ai-resources
+  personal  served     /home/you/.ai-resources
 
 Mounted for personal:
   /home/you/.ai-resources/skills  2 entries
@@ -229,7 +235,7 @@ airfs status
 daemon  running since Mon, 28 Jul 2026 09:14:02 CEST
 config  /home/you/.config/airfs/config.yaml
 
-  personal  served     ~/.ai-resources
+  personal  served     /home/you/.ai-resources
 
 Mounted for personal:
   /home/you/.ai-resources/skills  2 entries
@@ -255,7 +261,12 @@ airfs down
 Stopped the daemon.
 
   released       personal — the daemon is stopping
+Nothing is mounted.
 ```
+
+That last line is `down` confirming it looked at the whole machine afterwards and
+found nothing left behind.
+
 
 `down` releases **every** `airfs` mount on the machine — including anything a
 previous daemon left behind, or a mount whose serving process died. That is what

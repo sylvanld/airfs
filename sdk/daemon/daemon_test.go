@@ -136,6 +136,44 @@ workspaces:
 	}
 }
 
+// A report names a target as its author declared it, but a mountpoint read from
+// the kernel is always absolute. Both forms have to reach a client, or matching
+// what is mounted against what is declared silently finds nothing whenever a
+// target was written with a `~`.
+func TestStatusCarriesTheTargetInBothForms(t *testing.T) {
+	dir := host(t)
+	t.Setenv("HOME", dir)
+	path := declare(t, dir, `
+workspaces:
+  personal:
+    target: ~/personal
+    folders: [skills]
+    sources: [$DIR/global]
+`)
+	d, _ := start(t, path)
+
+	w := d.Status().Workspaces[0]
+	if w.Target != "~/personal" {
+		t.Errorf("Target = %q, want the path as declared", w.Target)
+	}
+	if w.TargetDir != filepath.Join(dir, "personal") {
+		t.Errorf("TargetDir = %q, want the resolved path", w.TargetDir)
+	}
+	// The resolved form is what a mountpoint is matched against.
+	if len(mount.Under(mountsOf(t), w.TargetDir)) != 1 {
+		t.Errorf("no mount found under the resolved target %q", w.TargetDir)
+	}
+}
+
+func mountsOf(t *testing.T) []mount.Mount {
+	t.Helper()
+	all, err := mount.Mounts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return all
+}
+
 func TestReloadLeavesUnchangedWorkspacesAlone(t *testing.T) {
 	dir := host(t)
 	path := declare(t, dir, `
@@ -236,6 +274,15 @@ workspaces:
 	}
 	if got := mountedFolders(t, filepath.Join(dir, "personal")); len(got) != 0 {
 		t.Errorf("a disabled workspace still has %v mounted", got)
+	}
+	// The mount table was read once at the top of reconciliation, so a
+	// mountpoint released during the pass is still listed in it. Releasing it a
+	// second time fails, and reporting that would claim a failure for work that
+	// succeeded.
+	for _, o := range outcomes {
+		if o.Action == daemon.Failed {
+			t.Errorf("releasing a disabled workspace reported a failure: %s", o)
+		}
 	}
 	// It stays declared and stays in every report; nothing of it is mounted.
 	status := d.Status()

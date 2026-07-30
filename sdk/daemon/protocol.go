@@ -80,8 +80,13 @@ type Status struct {
 // facts: a disabled workspace serving nothing is the configuration being
 // honoured, and an enabled one serving nothing is not.
 type WorkspaceStatus struct {
-	Name        string   `json:"name"`
+	Name string `json:"name"`
+	// Target is the path as its author declared it, which is what reports name.
+	// TargetDir is that path resolved, which is what a mountpoint read from the
+	// kernel is matched against — a declared `~/x` never compares equal to the
+	// absolute path the kernel reports.
 	Target      string   `json:"target"`
+	TargetDir   string   `json:"target_dir"`
 	Folders     []string `json:"folders"`
 	Enabled     bool     `json:"enabled"`
 	Established bool     `json:"established"`

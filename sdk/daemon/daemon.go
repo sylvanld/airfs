@@ -204,7 +204,11 @@ func (d *Daemon) reconcile(cfg *config.Config) []Outcome {
 	}
 
 	var outcomes []Outcome
-	held := map[string]bool{}
+	// held is what the daemon now vouches for; gone is what it released along
+	// the way. The mount table was read once, at the top, so a mountpoint this
+	// pass has already released is still listed in it — and unmounting it a
+	// second time fails, which would report a failure for work that succeeded.
+	held, gone := map[string]bool{}, map[string]bool{}
 	clear(d.failed)
 
 	// A workspace this daemon established and that is no longer declared at all
@@ -212,7 +216,7 @@ func (d *Daemon) reconcile(cfg *config.Config) []Outcome {
 	// reused by another workspace is free by the time it is needed.
 	for name := range d.servers {
 		if cfg.Lookup(name) == nil {
-			d.releaseWorkspace(name)
+			d.releaseWorkspace(name, gone)
 			outcomes = append(outcomes, Outcome{Workspace: name, Action: Released, Reason: "no longer declared"})
 		}
 	}
@@ -223,7 +227,7 @@ func (d *Daemon) reconcile(cfg *config.Config) []Outcome {
 		// deleting it do the same thing to the machine while doing very
 		// different things to the file.
 		if !w.Enabled {
-			outcomes = append(outcomes, d.stopServing(w, all))
+			outcomes = append(outcomes, d.stopServing(w, all, gone))
 			continue
 		}
 		if d.holds(w, all) {
@@ -244,8 +248,8 @@ func (d *Daemon) reconcile(cfg *config.Config) []Outcome {
 			// mount it cannot vouch for is worse than a brief gap.
 			action, reason = Reestablished, "it was mounted by something this daemon cannot vouch for"
 		}
-		d.releaseWorkspace(w.Name)
-		d.releaseUnder(all, w.Target.Resolved)
+		d.releaseWorkspace(w.Name, gone)
+		d.releaseUnder(all, w.Target.Resolved, gone)
 
 		server, err := mount.Serve(w)
 		if err != nil {
@@ -267,7 +271,7 @@ func (d *Daemon) reconcile(cfg *config.Config) []Outcome {
 	// would make the configuration a partial account of the machine. A stale
 	// mount is released here too, by the same rule and with no separate concept.
 	for _, m := range all {
-		if held[m.Dir] {
+		if held[m.Dir] || gone[m.Dir] {
 			continue
 		}
 		if err := mount.Unmount(m.Dir); err != nil {
@@ -281,9 +285,9 @@ func (d *Daemon) reconcile(cfg *config.Config) []Outcome {
 
 // stopServing releases a disabled workspace. It stays declared and stays in
 // every report; nothing of it is mounted.
-func (d *Daemon) stopServing(w *config.Workspace, all []mount.Mount) Outcome {
+func (d *Daemon) stopServing(w *config.Workspace, all []mount.Mount, gone map[string]bool) Outcome {
 	_, established := d.served[w.Name]
-	d.releaseWorkspace(w.Name)
+	d.releaseWorkspace(w.Name, gone)
 	if established || len(mount.Under(all, w.Target.Resolved)) > 0 {
 		return Outcome{Workspace: w.Name, Action: Released, Reason: "disabled"}
 	}
@@ -315,8 +319,13 @@ func (d *Daemon) holds(w *config.Workspace, all []mount.Mount) bool {
 // releaseWorkspace unmounts what this daemon holds for a workspace, if
 // anything. Its folders are released together: a half-served workspace is a
 // view that lies about what is available.
-func (d *Daemon) releaseWorkspace(name string) {
+func (d *Daemon) releaseWorkspace(name string, gone map[string]bool) {
 	if server := d.servers[name]; server != nil {
+		if w := d.served[name]; w != nil {
+			for _, folder := range w.Folders {
+				gone[w.FolderDir(folder)] = true
+			}
+		}
 		server.Unmount()
 	}
 	delete(d.servers, name)
@@ -325,9 +334,14 @@ func (d *Daemon) releaseWorkspace(name string) {
 
 // releaseUnder unmounts every airfs mount under target that this daemon does
 // not hold — the ones it found rather than made.
-func (d *Daemon) releaseUnder(all []mount.Mount, target string) {
+func (d *Daemon) releaseUnder(all []mount.Mount, target string, gone map[string]bool) {
 	for _, m := range mount.Under(all, target) {
-		mount.Unmount(m.Dir)
+		if gone[m.Dir] {
+			continue
+		}
+		if err := mount.Unmount(m.Dir); err == nil {
+			gone[m.Dir] = true
+		}
 	}
 }
 
@@ -347,6 +361,7 @@ func (d *Daemon) Status() *Status {
 		s.Workspaces = append(s.Workspaces, WorkspaceStatus{
 			Name:        w.Name,
 			Target:      w.Target.Declared,
+			TargetDir:   w.Target.Resolved,
 			Folders:     w.Folders,
 			Enabled:     w.Enabled,
 			Established: established,
