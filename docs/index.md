@@ -218,6 +218,7 @@ Grouped by what each one is *about* — nothing spans two groups.
 | | `reload` | Re-read the configuration and reconcile. |
 | | `status` | Which config the daemon loaded, and what is mounted. |
 | | `doctor` | Check the host and say what to install. |
+| 🔗 **Link** | `link --<tool>` | Point a project's tools at the skills that project owns. |
 
 `inspect` says what *should* be there; `status` says what *is*. When they
 disagree, that difference is the diagnosis. 🔎

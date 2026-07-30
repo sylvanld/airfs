@@ -9,6 +9,7 @@ serving something. One document per question.
 | [precedence.md](precedence.md) | Two sources ship the same skill — which wins, and how do I see it? |
 | [running-the-daemon.md](running-the-daemon.md) | How do I serve, reload, inspect and stop what I declared? |
 | [multiple-workspaces.md](multiple-workspaces.md) | How do I run several workspaces over the same sources? |
+| [linking-tools.md](linking-tools.md) | My project has its own skills — how do I get every tool to see them? |
 | [go-api.md](go-api.md) | How do I consume the merged view from Go, without mounting? |
 | [troubleshooting.md](troubleshooting.md) | Something is not served, or not visible. What now? |
 
@@ -60,6 +61,18 @@ Nothing spans two groups, which is what makes each one predictable.
     | `status [name]` | Which config the daemon loaded, what it declares, what is mounted. |
     | `doctor` | Check the host's prerequisites and name what to install. |
 
+=== "Linking 🔗"
+
+    One command, about the **project you are standing in** rather than about this
+    machine's workspaces. It reads no configuration and needs no daemon.
+
+    | Command | Does |
+    | --- | --- |
+    | `link --<tool>` | Point each named tool at the project's own `.ai/`, adopting what it already holds. See [Linking tools](linking-tools.md). |
+
+    What it writes is a plain committed symlink that **nothing reconciles** — no
+    command will report it, and none will offer to remove it.
+
 A report belongs with the thing it is a report *of*. `status` is about the
 daemon, so it sits with `up` and `down` despite only printing. What a workspace
 merges is not the daemon's state — it is true whether or not anything is
@@ -70,6 +83,8 @@ running — so that is `inspect`. 🧭
 ```bash
 airfs <command> [--config <file>]
 ```
+
+(Every command but `link`, which reads no configuration at all.)
 
 Defaults to `$XDG_CONFIG_HOME/airfs/config.yaml`. A `~` is expanded, and a
 relative path resolves against your **working directory** — you typed it on a

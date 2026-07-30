@@ -55,6 +55,11 @@ func run(args []string) int {
 	case "doctor":
 		err = cmdDoctor(rest)
 
+	// Linking: about a project, not about this machine's workspaces. It reads
+	// no configuration and needs no daemon.
+	case "link":
+		err = cmdLink(rest)
+
 	case "help", "-h", "--help":
 		usage(os.Stdout)
 		return airfs.ExitOK
@@ -98,7 +103,13 @@ Running — the daemon:
   status [name]   Report the daemon's state and what is mounted
   doctor          Check the host's mount prerequisites
 
-Flags, accepted by every command:
+Linking — about the project you are standing in, not about workspaces:
+  link --<tool>   Point each named tool at the project's own resources, and
+                  adopt what it already holds. --list prints the known tools.
+                  A symlink it writes is not reconciled by anything: no command
+                  will report it, and none will offer to remove it.
+
+Flags, accepted by every command but link:
   --config file   The configuration to read (default $XDG_CONFIG_HOME/airfs/config.yaml)
 
 Flags, accepted by add only:
@@ -109,6 +120,11 @@ Flags, accepted by add only:
 
 Flags, accepted by up only:
   --detach        Return once the workspaces are established instead of blocking
+
+Flags, accepted by link only:
+  --root dir      Where the project keeps its own resources (default .ai)
+  --dry-run       Report the moves and links, and write nothing
+  --list          Print the table of known tools and exit
 
 Exit codes: 0 success, 2 unsatisfied precondition, 1 anything else.
 `)

@@ -191,6 +191,10 @@ Two consequences worth knowing before running it:
 - Any adoption that would move an entry **out of the project** — a tool path
   that is itself outside the working directory. This command's whole frame of
   reference is the project it is run in.
+- A `--root` under which `<root>/<type>` **is, or contains, or sits inside** a
+  tool's own path. It would adopt into a directory it is about to replace with a
+  symlink to itself. Only `--root` can produce it, and it fails that tool alone,
+  since the same root can be perfectly valid for the other tools named.
 
 A symlink already pointing at `<root>/<type>` is **success**, not a conflict.
 Re-running after adding a tool is the expected way to use it, so every step is
@@ -212,15 +216,17 @@ adopted    .claude/skills    3 entries
   moved      commit
   moved      review
   moved      deploy
+
 adopted    .opencode/skills  3 entries
   moved      running
-  renamed    commit -> commit-opencode   (name taken by --claude)
-  deduped    review                      (identical to the adopted one)
+  renamed    commit -> commit-opencode  (name taken by --claude)
+  deduped    review                     (identical to what --claude contributed)
 
 linked     .claude/skills    -> ../.ai/skills
 linked     .opencode/skills  -> ../.ai/skills
 
-Relative and safe to commit. Write skills in .ai/skills/.
+Relative and safe to commit.
+Write skills in .ai/skills/.
 ```
 
 Every move is named, not counted. A summary line is enough for work a person
