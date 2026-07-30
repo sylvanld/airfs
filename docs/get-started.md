@@ -279,6 +279,9 @@ exactly what was running.
 
 - 📚 [User guide](user-guide/index.md) — sources, precedence, the daemon, the Go API
 - 🧭 [Declaring workspaces](user-guide/declaring-workspaces.md) — the full file format
+- 🔗 [Linking tools](user-guide/linking-tools.md) — a different job: `airfs link` puts a
+  *project's own* skills in one directory it owns and leaves each tool a
+  committable symlink to it. No workspace, no daemon.
 - 🧵 [Running the daemon](user-guide/running-the-daemon.md) — reload, systemd, reconciliation
 - 🩹 [Troubleshooting](user-guide/troubleshooting.md) — when something is not served
 - 📐 [Specs](specs/index.md) — why it behaves the way it does

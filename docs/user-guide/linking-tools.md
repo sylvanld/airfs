@@ -42,8 +42,9 @@ From now on you write skills in `.ai/skills/`, and **both tools see them.** ✍�
 !!! tip "Run it with `--dry-run` first"
 
     The first run in a real project rearranges its resources. `--dry-run` prints
-    exactly the report above and writes nothing, so you can read the moves
-    before they happen. It costs one command. 👀
+    the report above under a `Dry run — nothing below was written.` line and
+    writes nothing, so you can read the moves before they happen. It costs one
+    command. 👀
 
 ## It adopts what your tools already hold 📦
 
@@ -110,6 +111,9 @@ command exits `2`.
 - It is a **symlink pointing somewhere else**. Something established it
   deliberately.
 - A `--root` that lands **inside a tool's own directory**, or the reverse.
+- The tool's path is **outside the project** — a symlink out of it, most likely.
+  Adopting would move your resources somewhere the project does not contain, and
+  the whole frame of reference here is the directory you are standing in.
 
 A symlink that already points at the root is **success**, reported as
 `unchanged`. Re-running after adding a tool is the expected way to use this. ♻️
